@@ -4,6 +4,8 @@ const MAX_BODY_LENGTH = 4000;
 const MAX_QUERY_LENGTH = 2000;
 const MAX_USER_AGENT_LENGTH = 500;
 const MAX_IP_LENGTH = 120;
+const AUDIT_ALLOWED_ROLES = new Set(['MEMBER', 'LEADER']);
+const AUDIT_ALLOWED_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 function safeJson(value, maxLength) {
   if (value === undefined || value === null) return null;
@@ -54,6 +56,14 @@ function getClientIp(req) {
   return null;
 }
 
+function shouldAuditLog({ userSnapshot, method, path }) {
+  if (!userSnapshot || !userSnapshot.id) return false;
+  if (!AUDIT_ALLOWED_ROLES.has(userSnapshot.role)) return false;
+  if (!AUDIT_ALLOWED_METHODS.has(method)) return false;
+  // Audit only management mutations from admin APIs.
+  return path.startsWith('/api/admin/');
+}
+
 function auditLogger(req, res, next) {
   const startedAt = Date.now();
   const userSnapshot = req.user
@@ -75,9 +85,10 @@ function auditLogger(req, res, next) {
   const userAgent = req.get('user-agent')
     ? req.get('user-agent').slice(0, MAX_USER_AGENT_LENGTH)
     : null;
+  const shouldLog = shouldAuditLog({ userSnapshot, method, path });
 
   res.on('finish', async () => {
-    if (!userSnapshot || !userSnapshot.id) return;
+    if (!shouldLog || res.statusCode === 304) return;
 
     try {
       await prisma.auditLog.create({

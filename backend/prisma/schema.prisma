@@ -13,6 +13,7 @@ model User {
   name           String
   role           String  @default("USER") // USER, MEMBER, LEADER
   is_blacklisted Boolean @default(false)
+  last_login_at  DateTime @default(now())
   created_at     String  @default(dbgenerated("(datetime('now', 'localtime'))"))
   songs          Song[]
   audit_logs     AuditLog[]
@@ -30,8 +31,14 @@ model Song {
   is_anonymous Boolean   @default(false)
   status       String    @default("PENDING") // PENDING, APPROVED, REJECTED, PLAYED
   play_date    DateTime?
+  rejected_at  DateTime?
   created_at   DateTime  @default(now())
   user         User      @relation(fields: [user_id], references: [id])
+
+  @@index([type, status, created_at])
+  @@index([type, status, play_date])
+  @@index([user_id, created_at])
+  @@index([video_id, type, status, created_at])
 }
 
 model SystemToken {
@@ -59,4 +66,14 @@ model AuditLog {
 
   @@index([created_at])
   @@index([user_id])
+}
+
+model Session {
+  sid        String   @id
+  data       String
+  expires_at DateTime
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([expires_at])
 }

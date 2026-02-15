@@ -3,15 +3,38 @@ const prisma = require('./prisma');
 const {
   KST_TIMEZONE,
   getKstDate,
+  getKstDayRange,
   addDaysToKstDate,
   kstDateToUtcDate,
-  formatKstDate,
 } = require('./kst-time');
+
+async function cleanupExpiredSongs(now = new Date()) {
+  const todayKstDate = getKstDate(now);
+  const { start: todayStartUtc } = getKstDayRange(todayKstDate);
+  const rejectedCutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  await prisma.$transaction([
+    prisma.song.deleteMany({
+      where: {
+        status: 'APPROVED',
+        play_date: { lt: todayStartUtc },
+      },
+    }),
+    prisma.song.deleteMany({
+      where: {
+        status: 'REJECTED',
+        OR: [
+          { rejected_at: { lt: rejectedCutoff } },
+          { rejected_at: null, created_at: { lt: rejectedCutoff } },
+        ],
+      },
+    }),
+  ]);
+}
 
 function startScheduler() {
   // Run every day at 08:00 KST
   cron.schedule('0 8 * * *', async () => {
-    console.log('[Scheduler] Running daily wake-up song auto-approval at 08:00 KST...');
     try {
       const todayKst = getKstDate();
       const targetKstDate = addDaysToKstDate(todayKst, 3);
@@ -29,9 +52,6 @@ function startScheduler() {
 
       const remainingSlots = Math.max(0, 2 - alreadyApprovedCount);
       if (remainingSlots === 0) {
-        console.log(
-          `[Scheduler] Skipped auto-approval for ${formatKstDate(targetKstDate)} (KST): already ${alreadyApprovedCount} songs approved.`
-        );
         return;
       }
 
@@ -46,20 +66,25 @@ function startScheduler() {
           where: { id: song.id },
           data: { status: 'APPROVED', play_date: playDate },
         });
-        console.log(`[Scheduler] Approved song: ${song.title} for ${formatKstDate(targetKstDate)} (KST)`);
-      }
-
-      if (pendingSongs.length === 0) {
-        console.log(
-          `[Scheduler] No pending wake-up songs to approve. (${formatKstDate(targetKstDate)} KST slots left: ${remainingSlots})`
-        );
       }
     } catch (err) {
       console.error('[Scheduler] Error:', err);
     }
   }, { timezone: KST_TIMEZONE });
 
-  console.log('[Scheduler] Wake-up song auto-approval scheduled (daily at 08:00 KST).');
+  // Run every hour at minute 10 (KST)
+  cron.schedule('10 * * * *', async () => {
+    try {
+      await cleanupExpiredSongs();
+    } catch (err) {
+      console.error('[Scheduler] Cleanup Error:', err);
+    }
+  }, { timezone: KST_TIMEZONE });
+
+  // Run once on startup for immediate consistency
+  cleanupExpiredSongs().catch((err) => {
+    console.error('[Scheduler] Startup Cleanup Error:', err);
+  });
 }
 
 module.exports = { startScheduler };

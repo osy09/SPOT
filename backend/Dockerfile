@@ -20,11 +20,8 @@ RUN npx prisma generate
 # Copy source code
 COPY src ./src
 
-# Create data directory for SQLite
-RUN mkdir -p /app/data
-
 # Expose port
 EXPOSE 4000
 
-# Run migrations, seed, and start server
-CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && node src/index.js"]
+# For Turso, schema/data migration should be executed externally with Turso CLI.
+CMD ["sh", "-c", "if [ \"$PRISMA_BOOTSTRAP_ON_START\" = \"true\" ]; then npx prisma migrate deploy && npx prisma db seed; fi; node src/index.js"]

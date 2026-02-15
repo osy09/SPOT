@@ -8,19 +8,72 @@ const {
   formatKstDate,
 } = require('../lib/kst-time');
 const { sanitizeSong, sanitizeSongs } = require('../lib/song-response');
+const { getApplyNotice } = require('../lib/apply-notice');
+
+function isValidVideoId(videoId) {
+  return typeof videoId === 'string' && /^[a-zA-Z0-9_-]{11}$/.test(videoId);
+}
 
 function extractVideoId(url) {
-  const patterns = [
+  if (typeof url !== 'string') return null;
+  const trimmedUrl = url.trim();
+  if (!trimmedUrl) return null;
+
+  try {
+    const parsed = new URL(trimmedUrl);
+    const hostname = parsed.hostname.toLowerCase();
+    const pathSegments = parsed.pathname.split('/').filter(Boolean);
+
+    if (hostname === 'youtu.be') {
+      const candidate = pathSegments[0];
+      return isValidVideoId(candidate) ? candidate : null;
+    }
+
+    if (hostname.endsWith('youtube.com') || hostname.endsWith('youtube-nocookie.com')) {
+      if (parsed.pathname === '/watch') {
+        const candidate = parsed.searchParams.get('v');
+        return isValidVideoId(candidate) ? candidate : null;
+      }
+
+      const maybeIdPath = pathSegments[0];
+      if (maybeIdPath === 'embed' || maybeIdPath === 'shorts' || maybeIdPath === 'live') {
+        const candidate = pathSegments[1];
+        return isValidVideoId(candidate) ? candidate : null;
+      }
+    }
+  } catch {
+    // Fallback to regex parsing for malformed URL text.
+  }
+
+  const fallbackPatterns = [
     /(?:youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
     /(?:youtu\.be\/)([a-zA-Z0-9_-]{11})/,
     /(?:youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
     /(?:youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
   ];
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
+
+  for (const pattern of fallbackPatterns) {
+    const match = trimmedUrl.match(pattern);
     if (match) return match[1];
   }
+
   return null;
+}
+
+function parseYoutubeRequest(req, res) {
+  const youtube_url = typeof req.body?.youtube_url === 'string' ? req.body.youtube_url.trim() : '';
+  if (!youtube_url) {
+    res.status(400).json({ error: 'YouTube URL을 입력해주세요.' });
+    return null;
+  }
+
+  const video_id = extractVideoId(youtube_url);
+  if (!video_id) {
+    res.status(400).json({ error: '올바른 YouTube URL이 아닙니다.' });
+    return null;
+  }
+
+  return { youtube_url, video_id };
 }
 
 async function fetchVideoInfo(videoId) {
@@ -43,15 +96,9 @@ async function applyWakeup(req, res) {
     return res.status(403).json({ error: '신청이 거부되었습니다.' });
   }
 
-  const { youtube_url } = req.body;
-  if (!youtube_url) {
-    return res.status(400).json({ error: 'YouTube URL을 입력해주세요.' });
-  }
-
-  const video_id = extractVideoId(youtube_url);
-  if (!video_id) {
-    return res.status(400).json({ error: '올바른 YouTube URL이 아닙니다.' });
-  }
+  const parsedRequest = parseYoutubeRequest(req, res);
+  if (!parsedRequest) return;
+  const { youtube_url, video_id } = parsedRequest;
 
   // USER role can apply only one wake-up song per day (midnight 기준, KST)
   if (req.user.role === 'USER') {
@@ -68,7 +115,7 @@ async function applyWakeup(req, res) {
     });
 
     if (alreadyAppliedToday) {
-      return res.status(400).json({ error: 'USER 권한은 자정(한국시간) 기준 하루에 기상송 1곡만 신청할 수 있습니다.' });
+      return res.status(400).json({ error: '하루에 1곡까지 신청할 수 있습니다.' });
     }
   }
 
@@ -126,15 +173,9 @@ async function applyRadio(req, res) {
     return res.status(403).json({ error: '신청이 거부되었습니다.' });
   }
 
-  const { youtube_url } = req.body;
-  if (!youtube_url) {
-    return res.status(400).json({ error: 'YouTube URL을 입력해주세요.' });
-  }
-
-  const video_id = extractVideoId(youtube_url);
-  if (!video_id) {
-    return res.status(400).json({ error: '올바른 YouTube URL이 아닙니다.' });
-  }
+  const parsedRequest = parseYoutubeRequest(req, res);
+  if (!parsedRequest) return;
+  const { youtube_url, video_id } = parsedRequest;
 
   const info = await fetchVideoInfo(video_id);
   if (!info) {
@@ -274,9 +315,9 @@ async function cancelMyPendingSong(req, res) {
 
 async function searchYoutube(req, res) {
   try {
-    const { q } = req.query;
+    const queryText = typeof req.query.q === 'string' ? req.query.q.trim() : '';
 
-    if (!q || q.trim().length === 0) {
+    if (!queryText) {
       return res.status(400).json({ error: '검색어를 입력해주세요.' });
     }
 
@@ -293,7 +334,7 @@ async function searchYoutube(req, res) {
 
     const response = await youtube.search.list({
       part: ['snippet'],
-      q: q.trim(),
+      q: queryText,
       type: ['video'],
       maxResults: 10,
       videoCategoryId: '10', // Music category
@@ -311,11 +352,17 @@ async function searchYoutube(req, res) {
     res.json({ results });
   } catch (error) {
     console.error('[YouTube Search Error]', error.message);
-    if (error.code === 403) {
+    const statusCode = error?.response?.status || Number(error?.code);
+    if (statusCode === 403) {
       return res.status(403).json({ error: 'YouTube API 할당량이 초과되었습니다.' });
     }
     res.status(500).json({ error: '검색에 실패했습니다.' });
   }
+}
+
+async function getApplyNoticeSettings(req, res) {
+  const notice = await getApplyNotice();
+  res.json({ notice });
 }
 
 module.exports = {
@@ -327,4 +374,5 @@ module.exports = {
   getMySongs,
   cancelMyPendingSong,
   searchYoutube,
+  getApplyNoticeSettings,
 };

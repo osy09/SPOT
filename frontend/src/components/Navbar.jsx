@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
@@ -7,29 +7,28 @@ export default function Navbar() {
   const { dark, toggle } = useTheme();
   const isAdmin = user && (user.role === 'MEMBER' || user.role === 'LEADER');
   const isBlocked = user?.is_blacklisted;
-  const roleLabels = {
-    USER: '학생',
-    MEMBER: '방송부원',
-    LEADER: '방송부장',
-  };
+  const navClassName = ({ isActive }) => `cu-link text-xs sm:text-sm ${isActive ? 'is-active' : ''}`;
 
   return (
     <nav className="cu-nav-shell">
       <div className="cu-nav-wrap">
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-          <Link to="/" className="text-base sm:text-lg font-bold tracking-tight">SPOT</Link>
-          <Link to="/" className="cu-link text-xs sm:text-sm hidden sm:block">홈</Link>
+        <div className="flex items-center gap-3 sm:gap-5 flex-wrap">
+          <Link to="/" className="inline-flex items-center gap-1 mr-3 sm:mr-5 text-base sm:text-lg font-bold tracking-tight">
+            <img src="/spot-logo.svg" alt="SPOT logo" className="w-8 h-8 sm:w-9 sm:h-9" />
+            <span>SPOT</span>
+          </Link>
+          <NavLink to="/" end className={({ isActive }) => `hidden sm:block ${navClassName({ isActive })}`}>홈</NavLink>
           {user && (
             <>
               {!isBlocked && (
-                <Link to="/apply" className="cu-link text-xs sm:text-sm">신청</Link>
+                <NavLink to="/apply" className={navClassName}>신청</NavLink>
               )}
-              <Link to="/my" className="cu-link text-xs sm:text-sm hidden md:block">마이페이지</Link>
-              <Link to="/my" className="cu-link text-xs sm:text-sm md:hidden">MY</Link>
+              <NavLink to="/my" className={({ isActive }) => `hidden md:block ${navClassName({ isActive })}`}>마이페이지</NavLink>
+              <NavLink to="/my" className={({ isActive }) => `md:hidden ${navClassName({ isActive })}`}>MY</NavLink>
             </>
           )}
           {isAdmin && !isBlocked && (
-            <Link to="/admin" className="cu-link text-xs sm:text-sm">관리</Link>
+            <NavLink to="/admin" className={navClassName}>관리</NavLink>
           )}
         </div>
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
@@ -52,9 +51,6 @@ export default function Navbar() {
             <div className="flex items-center gap-1.5 sm:gap-2.5">
               <span className="text-sm hidden sm:inline" style={{ color: 'var(--cu-muted)' }}>
                 {user.name}
-              </span>
-              <span className="cu-badge cu-badge-muted hidden md:inline-flex">
-                {roleLabels[user.role] || user.role}
               </span>
               <button onClick={logout} className="cu-btn cu-btn-danger">
                 로그아웃

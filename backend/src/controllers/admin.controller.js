@@ -9,6 +9,11 @@ const {
   formatKstDate,
 } = require('../lib/kst-time');
 const { sanitizeSong, sanitizeSongs } = require('../lib/song-response');
+const { getApplyNotice, saveApplyNotice } = require('../lib/apply-notice');
+
+function getValidatedId(req, paramName = 'id') {
+  return req.validatedId ?? Number.parseInt(req.params[paramName], 10);
+}
 
 async function getWakeupQueue(req, res) {
   const songs = await prisma.song.findMany({
@@ -20,13 +25,26 @@ async function getWakeupQueue(req, res) {
 }
 
 async function rejectWakeup(req, res) {
-  const { id } = req.params;
-  await prisma.song.delete({ where: { id: Number(id) } });
+  const id = getValidatedId(req);
+  const song = await prisma.song.findUnique({
+    where: { id },
+    select: { id: true, type: true },
+  });
+
+  if (!song) {
+    return res.status(404).json({ error: '기상송을 찾을 수 없습니다.' });
+  }
+
+  if (song.type !== 'WAKEUP') {
+    return res.status(400).json({ error: '기상송만 삭제할 수 있습니다.' });
+  }
+
+  await prisma.song.delete({ where: { id } });
   res.json({ message: '기상송이 삭제되었습니다.' });
 }
 
 async function updateWakeupSchedule(req, res) {
-  const { id } = req.params;
+  const id = getValidatedId(req);
   const { play_date } = req.body;
 
   if (!play_date) {
@@ -47,7 +65,7 @@ async function updateWakeupSchedule(req, res) {
   }
 
   const song = await prisma.song.findUnique({
-    where: { id: Number(id) },
+    where: { id },
   });
 
   if (!song) {
@@ -59,7 +77,7 @@ async function updateWakeupSchedule(req, res) {
   }
 
   const updated = await prisma.song.update({
-    where: { id: Number(id) },
+    where: { id },
     data: {
       status: 'APPROVED',
       play_date: requestedStartUtc,
@@ -70,10 +88,10 @@ async function updateWakeupSchedule(req, res) {
 }
 
 async function cancelWakeupApproval(req, res) {
-  const { id } = req.params;
+  const id = getValidatedId(req);
 
   const song = await prisma.song.findUnique({
-    where: { id: Number(id) },
+    where: { id },
   });
 
   if (!song) {
@@ -89,7 +107,7 @@ async function cancelWakeupApproval(req, res) {
   }
 
   const updated = await prisma.song.update({
-    where: { id: Number(id) },
+    where: { id },
     data: {
       status: 'PENDING',
       play_date: null,
@@ -112,7 +130,7 @@ async function approveAllRadio(req, res) {
   const now = new Date();
   const result = await prisma.song.updateMany({
     where: { type: 'RADIO', status: 'PENDING' },
-    data: { status: 'APPROVED', play_date: now },
+    data: { status: 'APPROVED', play_date: now, rejected_at: null },
   });
 
   res.json({
@@ -124,19 +142,53 @@ async function approveAllRadio(req, res) {
 }
 
 async function approveRadio(req, res) {
-  const { id } = req.params;
+  const id = getValidatedId(req);
+  const currentSong = await prisma.song.findUnique({
+    where: { id },
+    select: { id: true, type: true, status: true },
+  });
+
+  if (!currentSong) {
+    return res.status(404).json({ error: '신청을 찾을 수 없습니다.' });
+  }
+
+  if (currentSong.type !== 'RADIO') {
+    return res.status(400).json({ error: '점심방송 신청만 승인할 수 있습니다.' });
+  }
+
+  if (currentSong.status !== 'PENDING') {
+    return res.status(400).json({ error: '대기중 신청만 승인할 수 있습니다.' });
+  }
+
   const song = await prisma.song.update({
-    where: { id: Number(id) },
-    data: { status: 'APPROVED', play_date: new Date() },
+    where: { id },
+    data: { status: 'APPROVED', play_date: new Date(), rejected_at: null },
   });
   res.json({ song: sanitizeSong(song) });
 }
 
 async function rejectRadio(req, res) {
-  const { id } = req.params;
+  const id = getValidatedId(req);
+  const currentSong = await prisma.song.findUnique({
+    where: { id },
+    select: { id: true, type: true, status: true },
+  });
+
+  if (!currentSong) {
+    return res.status(404).json({ error: '신청을 찾을 수 없습니다.' });
+  }
+
+  if (currentSong.type !== 'RADIO') {
+    return res.status(400).json({ error: '점심방송 신청만 거절할 수 있습니다.' });
+  }
+
+  if (currentSong.status !== 'PENDING') {
+    return res.status(400).json({ error: '대기중 신청만 거절할 수 있습니다.' });
+  }
+
   const song = await prisma.song.update({
-    where: { id: Number(id) },
-    data: { status: 'REJECTED' },
+    where: { id },
+    data: { status: 'REJECTED', rejected_at: new Date() },
   });
   res.json({ song: sanitizeSong(song) });
 }
@@ -162,7 +214,9 @@ async function getAuditLogs(req, res) {
   const pageSize = Math.min(100, Math.max(1, Number.parseInt(req.query.pageSize, 10) || 30));
   const skip = (page - 1) * pageSize;
 
-  const where = {};
+  const where = {
+    status_code: { not: 304 },
+  };
 
   const queryText = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   if (queryText) {
@@ -196,6 +250,9 @@ async function getAuditLogs(req, res) {
     if (Number.isNaN(status) || status < 100 || status > 599) {
       return res.status(400).json({ error: '유효하지 않은 status입니다.' });
     }
+    if (status === 304) {
+      return res.status(400).json({ error: '304 상태코드는 감사 로그 조회 대상이 아닙니다.' });
+    }
     where.status_code = status;
   }
 
@@ -222,14 +279,14 @@ async function getAuditLogs(req, res) {
 
 // Blacklist management
 async function searchUsers(req, res) {
-  const { q } = req.query;
-  if (!q) return res.json({ users: [] });
+  const queryText = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  if (!queryText) return res.json({ users: [] });
 
   const users = await prisma.user.findMany({
     where: {
       OR: [
-        { email: { contains: q } },
-        { name: { contains: q } },
+        { email: { contains: queryText } },
+        { name: { contains: queryText } },
       ],
     },
     select: { id: true, email: true, name: true, role: true, is_blacklisted: true },
@@ -238,8 +295,8 @@ async function searchUsers(req, res) {
 }
 
 async function toggleBlacklist(req, res) {
-  const { id } = req.params;
-  const user = await prisma.user.findUnique({ where: { id: Number(id) } });
+  const id = getValidatedId(req);
+  const user = await prisma.user.findUnique({ where: { id } });
   if (!user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
 
   // Prevent blocking LEADER and MEMBER
@@ -248,24 +305,49 @@ async function toggleBlacklist(req, res) {
   }
 
   const updated = await prisma.user.update({
-    where: { id: Number(id) },
+    where: { id },
     data: { is_blacklisted: !user.is_blacklisted },
   });
   res.json({ user: updated });
 }
 
 async function updateUserRole(req, res) {
-  const { id } = req.params;
+  const id = getValidatedId(req);
   const { role } = req.body;
   if (!['USER', 'MEMBER', 'LEADER'].includes(role)) {
     return res.status(400).json({ error: '올바른 역할이 아닙니다.' });
   }
 
   const updated = await prisma.user.update({
-    where: { id: Number(id) },
+    where: { id },
     data: { role },
   });
   res.json({ user: updated });
+}
+
+async function getApplyNoticeSettings(req, res) {
+  const notice = await getApplyNotice();
+  res.json({ notice });
+}
+
+async function updateApplyNoticeSettings(req, res) {
+  const { wakeupPrimary, radioPrimary, common } = req.body || {};
+  const fields = { wakeupPrimary, radioPrimary, common };
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (typeof value !== 'string') {
+      return res.status(400).json({ error: `${key}는 문자열이어야 합니다.` });
+    }
+    if (value.trim().length === 0) {
+      return res.status(400).json({ error: `${key}는 비워둘 수 없습니다.` });
+    }
+    if (value.length > 200) {
+      return res.status(400).json({ error: `${key}는 200자 이하여야 합니다.` });
+    }
+  }
+
+  const notice = await saveApplyNotice(fields);
+  res.json({ notice, message: '신청 안내사항이 저장되었습니다.' });
 }
 
 async function downloadTodayWakeup(req, res) {
@@ -299,7 +381,6 @@ async function downloadTodayWakeup(req, res) {
     }
 
     const url = `https://www.youtube.com/watch?v=${videoId}`;
-    console.log(`[Download] Starting download for: ${song.title} (${videoId})`);
 
     const sanitizedTitle = song.title.replace(/[<>:"/\\|?*]/g, '_');
 
@@ -344,8 +425,6 @@ async function downloadTodayWakeup(req, res) {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
-    console.log('[Download] yt-dlp process started');
-
     // Create ffmpeg process
     ffmpegProcess = spawn('ffmpeg', [
       '-loglevel', 'error',
@@ -361,12 +440,8 @@ async function downloadTodayWakeup(req, res) {
       stdio: ['pipe', 'pipe', 'pipe']
     });
 
-    console.log('[Download] FFmpeg process started');
-
     let ytDlpError = '';
     let ffmpegError = '';
-    let completed = false;
-
     ytDlpProcess.on('error', (error) => {
       console.error('[Download] yt-dlp start error:', error.message);
       if (ffmpegProcess && !ffmpegProcess.killed) {
@@ -415,7 +490,6 @@ async function downloadTodayWakeup(req, res) {
     });
 
     ffmpegProcess.on('close', (code) => {
-      completed = true;
       if (code !== 0) {
         console.error('[Download] FFmpeg exited with code:', code);
         if (ffmpegError) {
@@ -433,9 +507,6 @@ async function downloadTodayWakeup(req, res) {
 
     // Cleanup on client disconnect
     res.on('close', () => {
-      if (!completed) {
-        console.log('[Download] Client disconnected, cleaning up');
-      }
       if (ytDlpProcess && !ytDlpProcess.killed) ytDlpProcess.kill('SIGKILL');
       if (ffmpegProcess && !ffmpegProcess.killed) ffmpegProcess.kill('SIGKILL');
     });
@@ -479,5 +550,7 @@ module.exports = {
   searchUsers,
   toggleBlacklist,
   updateUserRole,
+  getApplyNoticeSettings,
+  updateApplyNoticeSettings,
   downloadTodayWakeup,
 };

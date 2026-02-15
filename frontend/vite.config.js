@@ -3,14 +3,17 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const swBuildTag = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)
+
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
+      filename: `sw-${swBuildTag}.js`,
       injectRegister: null,
       registerType: 'autoUpdate',
-      includeAssets: ['vite.svg'],
+      includeAssets: ['spot-logo.svg'],
       manifest: {
         name: 'SPOT - 대구소프트웨어마이스터고 방송부',
         short_name: 'SPOT',
@@ -44,6 +47,7 @@ export default defineConfig({
         ]
       },
       workbox: {
+        cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         navigateFallbackDenylist: [/^\/api\//, /^\/auth\//],
         runtimeCaching: [

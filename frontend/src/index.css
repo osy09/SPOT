@@ -1,42 +1,58 @@
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
-
 :root {
-  --cu-bg: #f4f6f8;
+  --cu-bg: #eef2f6;
   --cu-panel: #ffffff;
-  --cu-panel-soft: #f8fafc;
-  --cu-line: #dde3ea;
-  --cu-line-strong: #cad3de;
-  --cu-text: #12212f;
-  --cu-muted: #6b7a89;
-  --cu-accent: #1f7aec;
-  --cu-accent-soft: #e8f1ff;
-  --cu-success: #169873;
-  --cu-success-soft: #e8faf4;
-  --cu-danger: #c23631;
-  --cu-danger-soft: #fff1f0;
-  --cu-warning: #c35f17;
-  --cu-warning-soft: #fff3ec;
+  --cu-panel-soft: #f1f4f8;
+  --cu-panel-muted: #e6ebf2;
+  --cu-line: #cfd7e1;
+  --cu-line-strong: #b8c4d1;
+  --cu-text: #172433;
+  --cu-muted: #5d6d7f;
+  --cu-accent: #1f6fd8;
+  --cu-accent-soft: #dbe9ff;
+  --cu-accent-border: #a7c7f5;
+  --cu-success: #1f8b64;
+  --cu-success-soft: #dff2e9;
+  --cu-success-border: #9fceb9;
+  --cu-danger: #b83a34;
+  --cu-danger-soft: #f7e0df;
+  --cu-danger-border: #e1aaa6;
+  --cu-warning: #b16122;
+  --cu-warning-soft: #f8e7d8;
+  --cu-warning-border: #dfb186;
+  --cu-btn-blue: #0283f0;
+  --cu-btn-red: #ff4242;
+  --cu-neutral-btn: #5f6f82;
+  --cu-focus-ring: #bcd3f3;
 }
 
 .dark {
-  --cu-bg: #0f1722;
-  --cu-panel: #162131;
-  --cu-panel-soft: #1c2839;
-  --cu-line: #2a394d;
-  --cu-line-strong: #34475e;
-  --cu-text: #deebfa;
-  --cu-muted: #9ab0c8;
-  --cu-accent: #67a4ff;
-  --cu-accent-soft: #1e3558;
-  --cu-success: #4dd0a3;
-  --cu-success-soft: #193d35;
-  --cu-danger: #ff7d7a;
-  --cu-danger-soft: #4d2528;
-  --cu-warning: #f3a764;
-  --cu-warning-soft: #4e3320;
+  --cu-bg: #151b23;
+  --cu-panel: #1e2631;
+  --cu-panel-soft: #283240;
+  --cu-panel-muted: #323d4c;
+  --cu-line: #404d5d;
+  --cu-line-strong: #526174;
+  --cu-text: #e2ebf5;
+  --cu-muted: #a5b6c9;
+  --cu-accent: #5f9af0;
+  --cu-accent-soft: #244168;
+  --cu-accent-border: #3d638f;
+  --cu-success: #4bc191;
+  --cu-success-soft: #244135;
+  --cu-success-border: #3e6957;
+  --cu-danger: #f07f78;
+  --cu-danger-soft: #4a2e2d;
+  --cu-danger-border: #6c4240;
+  --cu-warning: #e3a15f;
+  --cu-warning-soft: #4d3929;
+  --cu-warning-border: #6f543f;
+  --cu-btn-blue: #0283f0;
+  --cu-btn-red: #ff4242;
+  --cu-neutral-btn: #5f6f82;
+  --cu-focus-ring: #3f608a;
 }
 
 * {
@@ -53,17 +69,7 @@ body {
   margin: 0;
   color: var(--cu-text);
   font-family: "IBM Plex Sans", "Pretendard", "Noto Sans KR", sans-serif;
-  background:
-    radial-gradient(circle at 0% 0%, rgba(233, 239, 246, 0.92) 0%, rgba(233, 239, 246, 0) 45%),
-    radial-gradient(circle at 100% 100%, rgba(237, 243, 251, 0.9) 0%, rgba(237, 243, 251, 0) 48%),
-    var(--cu-bg);
-}
-
-.dark body {
-  background:
-    radial-gradient(circle at 0% 0%, rgba(31, 52, 79, 0.7) 0%, rgba(31, 52, 79, 0) 45%),
-    radial-gradient(circle at 100% 100%, rgba(37, 57, 83, 0.6) 0%, rgba(37, 57, 83, 0) 50%),
-    var(--cu-bg);
+  background: var(--cu-bg);
 }
 
 a,
@@ -99,18 +105,12 @@ select {
     font-weight: 700;
   }
 
-  .cu-subtitle {
-    margin-top: 0.35rem;
-    color: var(--cu-muted);
-    font-size: 0.85rem;
-  }
-
   .cu-card {
-    background: color-mix(in srgb, var(--cu-panel) 94%, transparent);
+    background: var(--cu-panel);
     border: 1px solid var(--cu-line);
     border-radius: 0.95rem;
     padding: 0.95rem;
-    box-shadow: 0 7px 20px rgba(18, 33, 47, 0.06);
+    box-shadow: none;
   }
 
   @media (min-width: 640px) {
@@ -121,14 +121,14 @@ select {
 
   .cu-subcard {
     background: var(--cu-panel-soft);
-    border: 1px solid color-mix(in srgb, var(--cu-line) 86%, transparent);
+    border: 1px solid var(--cu-line);
     border-radius: 0.8rem;
   }
 
   .cu-input {
     width: 100%;
     border: 1px solid var(--cu-line-strong);
-    background: color-mix(in srgb, var(--cu-panel) 96%, transparent);
+    background: var(--cu-panel);
     color: var(--cu-text);
     border-radius: 0.72rem;
     padding: 0.56rem 0.72rem;
@@ -138,12 +138,12 @@ select {
   }
 
   .cu-input::placeholder {
-    color: color-mix(in srgb, var(--cu-muted) 82%, transparent);
+    color: var(--cu-muted);
   }
 
   .cu-input:focus {
     border-color: var(--cu-accent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--cu-accent-soft) 72%, transparent);
+    box-shadow: 0 0 0 3px var(--cu-focus-ring);
   }
 
   .cu-tabbar {
@@ -152,7 +152,7 @@ select {
     border: 1px solid var(--cu-line);
     border-radius: 0.72rem;
     padding: 0.3rem;
-    background: color-mix(in srgb, var(--cu-panel) 92%, transparent);
+    background: var(--cu-panel-muted);
   }
 
   .cu-tab {
@@ -165,16 +165,23 @@ select {
     font-size: 0.79rem;
     padding: 0.45rem 0.62rem;
     transition: all 0.16s ease;
+    white-space: nowrap;
+  }
+
+  .cu-tabbar.w-max .cu-tab {
+    flex: 0 0 auto;
+    min-width: 6.8rem;
+    padding: 0.45rem 0.9rem;
   }
 
   .cu-tab:hover {
     color: var(--cu-text);
-    background: color-mix(in srgb, var(--cu-panel-soft) 78%, transparent);
+    background: var(--cu-panel-soft);
   }
 
   .cu-tab.is-active {
     color: var(--cu-accent);
-    border-color: color-mix(in srgb, var(--cu-accent) 25%, var(--cu-line));
+    border-color: var(--cu-accent-border);
     background: var(--cu-accent-soft);
   }
 
@@ -198,57 +205,55 @@ select {
     cursor: not-allowed;
   }
 
-  .cu-btn-primary {
-    color: #fff;
-    border-color: color-mix(in srgb, var(--cu-accent) 84%, #153056);
-    background: var(--cu-accent);
-  }
-
-  .cu-btn-primary:hover:enabled {
-    filter: brightness(0.95);
-  }
-
+  .cu-btn-primary,
   .cu-btn-secondary {
-    color: var(--cu-accent);
-    border-color: color-mix(in srgb, var(--cu-accent) 26%, var(--cu-line));
-    background: var(--cu-accent-soft);
-  }
-
-  .cu-btn-secondary:hover:enabled {
-    filter: brightness(0.97);
+    color: #fff;
+    border-color: var(--cu-btn-blue);
+    background: var(--cu-btn-blue);
   }
 
   .cu-btn-success {
-    color: var(--cu-success);
-    border-color: color-mix(in srgb, var(--cu-success) 30%, var(--cu-line));
-    background: var(--cu-success-soft);
+    color: #fff;
+    border-color: var(--cu-success);
+    background: var(--cu-success);
   }
 
   .cu-btn-danger {
-    color: var(--cu-danger);
-    border-color: color-mix(in srgb, var(--cu-danger) 30%, var(--cu-line));
-    background: var(--cu-danger-soft);
+    color: #fff;
+    border-color: var(--cu-btn-red);
+    background: var(--cu-btn-red);
   }
 
   .cu-btn-muted {
-    color: var(--cu-muted);
-    border-color: var(--cu-line-strong);
-    background: color-mix(in srgb, var(--cu-panel) 95%, transparent);
+    color: #fff;
+    border-color: var(--cu-neutral-btn);
+    background: var(--cu-neutral-btn);
   }
 
+  .cu-btn-primary:hover:enabled,
+  .cu-btn-secondary:hover:enabled,
+  .cu-btn-success:hover:enabled,
+  .cu-btn-danger:hover:enabled,
   .cu-btn-muted:hover:enabled {
-    color: var(--cu-text);
-    border-color: var(--cu-line);
-    background: var(--cu-panel-soft);
+    filter: brightness(0.95);
   }
 
   .cu-link {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 0.55rem;
+    padding: 0.26rem 0.5rem;
     color: var(--cu-muted);
+    font-weight: 500;
     transition: color 0.16s ease;
   }
 
   .cu-link:hover {
     color: var(--cu-text);
+  }
+
+  .cu-link.is-active {
+    font-weight: 700;
   }
 
   .cu-badge {
@@ -265,31 +270,25 @@ select {
 
   .cu-badge-muted {
     color: var(--cu-muted);
-    border-color: color-mix(in srgb, var(--cu-line) 90%, transparent);
-    background: color-mix(in srgb, var(--cu-panel-soft) 94%, transparent);
-  }
-
-  .cu-badge-info {
-    color: var(--cu-accent);
-    border-color: color-mix(in srgb, var(--cu-accent) 26%, var(--cu-line));
-    background: var(--cu-accent-soft);
+    border-color: var(--cu-line);
+    background: var(--cu-panel-soft);
   }
 
   .cu-badge-success {
     color: var(--cu-success);
-    border-color: color-mix(in srgb, var(--cu-success) 30%, var(--cu-line));
+    border-color: var(--cu-success-border);
     background: var(--cu-success-soft);
   }
 
   .cu-badge-warning {
     color: var(--cu-warning);
-    border-color: color-mix(in srgb, var(--cu-warning) 30%, var(--cu-line));
+    border-color: var(--cu-warning-border);
     background: var(--cu-warning-soft);
   }
 
   .cu-badge-danger {
     color: var(--cu-danger);
-    border-color: color-mix(in srgb, var(--cu-danger) 30%, var(--cu-line));
+    border-color: var(--cu-danger-border);
     background: var(--cu-danger-soft);
   }
 
@@ -297,7 +296,7 @@ select {
     border: 1px solid var(--cu-line);
     border-radius: 0.95rem;
     overflow-x: auto;
-    background: color-mix(in srgb, var(--cu-panel) 96%, transparent);
+    background: var(--cu-panel);
   }
 
   .cu-table {
@@ -312,13 +311,13 @@ select {
     padding: 0.58rem 0.72rem;
     color: var(--cu-muted);
     font-weight: 600;
-    background: color-mix(in srgb, var(--cu-panel-soft) 95%, transparent);
+    background: var(--cu-panel-soft);
     border-bottom: 1px solid var(--cu-line);
   }
 
   .cu-table td {
     padding: 0.58rem 0.72rem;
-    border-bottom: 1px solid color-mix(in srgb, var(--cu-line) 86%, transparent);
+    border-bottom: 1px solid var(--cu-line);
     vertical-align: top;
   }
 
@@ -332,9 +331,11 @@ select {
   }
 
   .cu-nav-shell {
+    position: sticky;
+    top: 0;
+    z-index: 50;
     border-bottom: 1px solid var(--cu-line);
-    background: color-mix(in srgb, var(--cu-panel) 92%, transparent);
-    backdrop-filter: blur(7px);
+    background: var(--cu-panel);
   }
 
   .cu-nav-wrap {

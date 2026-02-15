@@ -10,10 +10,12 @@ const {
   getMySongs,
   cancelMyPendingSong,
   searchYoutube,
+  getApplyNoticeSettings,
 } = require('../controllers/song.controller');
 
 router.get('/schedule', getSchedule);
 router.get('/today', getTodayWakeup);
+router.get('/apply-notice', isAuthenticated, getApplyNoticeSettings);
 router.get('/wakeup/queue', isAuthenticated, getWakeupQueue);
 router.get('/my', isAuthenticated, getMySongs);
 router.delete('/my/:id', isAuthenticated, validateIdParam(), cancelMyPendingSong);

@@ -17,6 +17,8 @@
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
+    "turso:import": "./scripts/turso/import-local-db.sh",
+    "turso:migrate": "./scripts/turso/apply-prisma-migrations.sh",
     "setup": "./scripts/dev-setup.sh",
     "setup:docker": "./scripts/docker-setup.sh"
   },

@@ -1,10 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import api from '../api/client';
 import SongCard from '../components/SongCard';
 
 const WAKEUP_QUEUE_MANAGER_ROLES = new Set(['MEMBER', 'LEADER']);
+const DEFAULT_APPLY_NOTICE = {
+  wakeupPrimary: '기상송은 먼저 신청된 순서대로 승인됩니다.',
+  radioPrimary: '점심방송은 매주 화, 목요일 진행합니다.',
+  common: '부적절한 곡은 거절될 수 있습니다.',
+};
 
 export default function Apply() {
   const { user } = useAuth();
@@ -16,9 +21,19 @@ export default function Apply() {
   const [wakeupQueue, setWakeupQueue] = useState([]);
   const [queueLoading, setQueueLoading] = useState(true);
   const [deletingQueueSongId, setDeletingQueueSongId] = useState(null);
+  const [applyNotice, setApplyNotice] = useState(DEFAULT_APPLY_NOTICE);
+  const searchTimerRef = useRef(null);
+  const searchRequestSeqRef = useRef(0);
   const { showToast } = useToast();
   const normalizedRole = typeof user?.role === 'string' ? user.role.toUpperCase() : '';
   const canManageWakeupQueue = WAKEUP_QUEUE_MANAGER_ROLES.has(normalizedRole);
+
+  const clearSearchTimer = () => {
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
+  };
 
   const loadWakeupQueue = async () => {
     setQueueLoading(true);
@@ -34,8 +49,20 @@ export default function Apply() {
 
   useEffect(() => {
     loadWakeupQueue();
+    api.get('/api/songs/apply-notice')
+      .then((res) => {
+        if (!res.data?.notice) return;
+        setApplyNotice({
+          wakeupPrimary: res.data.notice.wakeupPrimary || DEFAULT_APPLY_NOTICE.wakeupPrimary,
+          radioPrimary: res.data.notice.radioPrimary || DEFAULT_APPLY_NOTICE.radioPrimary,
+          common: res.data.notice.common || DEFAULT_APPLY_NOTICE.common,
+        });
+      })
+      .catch(() => {
+        setApplyNotice(DEFAULT_APPLY_NOTICE);
+      });
     return () => {
-      clearTimeout(window.searchTimer);
+      clearSearchTimer();
     };
   }, []);
 
@@ -55,35 +82,50 @@ export default function Apply() {
     setInput(value);
 
     // URL이 아니고 2글자 이상이면 자동 검색
+    clearSearchTimer();
     if (!isYouTubeUrl(value) && value.trim().length >= 2) {
       // 디바운스를 위한 타이머
-      clearTimeout(window.searchTimer);
-      window.searchTimer = setTimeout(async () => {
+      searchTimerRef.current = setTimeout(async () => {
         await performSearch(value);
       }, 500); // 0.5초 대기 후 검색
     } else {
+      searchRequestSeqRef.current += 1;
+      setSearching(false);
       setSearchResults([]);
     }
   };
 
   const performSearch = async (query) => {
-    if (!query.trim()) return;
+    const queryText = query.trim();
+    if (!queryText) {
+      setSearchResults([]);
+      return;
+    }
 
+    const requestSeq = searchRequestSeqRef.current + 1;
+    searchRequestSeqRef.current = requestSeq;
     setSearching(true);
     try {
-      const res = await api.get(`/api/songs/search?q=${encodeURIComponent(query)}`);
+      const res = await api.get(`/api/songs/search?q=${encodeURIComponent(queryText)}`);
+      if (requestSeq !== searchRequestSeqRef.current) return;
       setSearchResults(res.data.results);
     } catch {
       // 검색 실패 시 조용히 처리 (에러 토스트 표시 안 함)
+      if (requestSeq !== searchRequestSeqRef.current) return;
       setSearchResults([]);
     } finally {
-      setSearching(false);
+      if (requestSeq === searchRequestSeqRef.current) {
+        setSearching(false);
+      }
     }
   };
 
   const handleSelectSong = (song) => {
+    clearSearchTimer();
+    searchRequestSeqRef.current += 1;
     setInput(song.youtube_url);
     setSearchResults([]);
+    setSearching(false);
   };
 
   const handleSubmit = async (e) => {
@@ -110,7 +152,10 @@ export default function Apply() {
         showToast(`"${res.data.song.title}" 점심방송 신청 완료!`, 'success');
       }
       setInput('');
+      clearSearchTimer();
+      searchRequestSeqRef.current += 1;
       setSearchResults([]);
+      setSearching(false);
     } catch (err) {
       showToast(err.response?.data?.error || '오류가 발생했습니다.', 'error');
     } finally {
@@ -249,8 +294,8 @@ export default function Apply() {
           <div className="p-4 rounded-lg border" style={{ background: 'var(--cu-accent-soft)', borderColor: 'color-mix(in srgb, var(--cu-accent) 25%, var(--cu-line))' }}>
             <h3 className="text-sm font-medium mb-2" style={{ color: 'var(--cu-accent)' }}>안내사항</h3>
             <ul className="text-xs space-y-1" style={{ color: 'var(--cu-accent)' }}>
-              <li>• {tab === 'wakeup' ? '기상송은 먼저 신청된 순서대로 승인됩니다. (3일 후 재생)' : '점심방송은 매주 화, 목요일 진행합니다.'}</li>
-              <li>• 부적절한 곡은 거절될 수 있습니다.</li>
+              <li>• {tab === 'wakeup' ? applyNotice.wakeupPrimary : applyNotice.radioPrimary}</li>
+              <li>• {applyNotice.common}</li>
             </ul>
           </div>
 

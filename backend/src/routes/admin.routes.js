@@ -21,6 +21,8 @@ const {
   searchUsers,
   toggleBlacklist,
   updateUserRole,
+  getApplyNoticeSettings,
+  updateApplyNoticeSettings,
   downloadTodayWakeup,
 } = require('../controllers/admin.controller');
 const {
@@ -57,5 +59,7 @@ router.get('/youtube/auth', hasRole('LEADER'), startYoutubeAuth);
 router.get('/users', hasRole('LEADER'), searchUsers);
 router.patch('/users/:id/blacklist', hasRole('LEADER'), validateIdParam(), toggleBlacklist);
 router.patch('/users/:id/role', hasRole('LEADER'), validateIdParam(), validateRoleUpdate, preventSelfDemotion, updateUserRole);
+router.get('/settings/apply-notice', hasRole('LEADER'), getApplyNoticeSettings);
+router.patch('/settings/apply-notice', hasRole('LEADER'), updateApplyNoticeSettings);
 
 module.exports = router;

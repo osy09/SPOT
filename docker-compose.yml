@@ -7,7 +7,10 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=file:/app/prisma/dev.db
+      - DATABASE_URL=${TURSO_DATABASE_URL}
+      - TURSO_DATABASE_URL=${TURSO_DATABASE_URL}
+      - TURSO_AUTH_TOKEN=${TURSO_AUTH_TOKEN}
+      - PRISMA_BOOTSTRAP_ON_START=${PRISMA_BOOTSTRAP_ON_START}
       - PORT=4000
       - SESSION_SECRET=${SESSION_SECRET}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
@@ -20,8 +23,6 @@ services:
       - YOUTUBE_REDIRECT_URI=${YOUTUBE_REDIRECT_URI}
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
       - FRONTEND_URL=${FRONTEND_URL}
-    volumes:
-      - ./backend/prisma:/app/prisma
     networks:
       - spot-network
 

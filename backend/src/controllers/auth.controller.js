@@ -2,8 +2,8 @@ function getMe(req, res) {
   if (!req.isAuthenticated()) {
     return res.json({ user: null });
   }
-  const { id, email, name, role, is_blacklisted } = req.user;
-  res.json({ user: { id, email, name, role, is_blacklisted } });
+  const { id, email, name, role, is_blacklisted, last_login_at } = req.user;
+  res.json({ user: { id, email, name, role, is_blacklisted, last_login_at } });
 }
 
 function logout(req, res, next) {

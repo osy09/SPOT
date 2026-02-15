@@ -14,10 +14,9 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@prisma/adapter-libsql": "^6.19.2",
     "@prisma/client": "^6.19.2",
     "axios": "^1.13.5",
-    "better-sqlite3": "^11.7.0",
-    "connect-sqlite3": "^0.9.13",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",

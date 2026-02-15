@@ -25,6 +25,7 @@ passport.use(
     async (accessToken, refreshToken, profile, done) => {
       try {
         const email = profile.emails[0].value;
+        const loginTimestamp = new Date();
 
         if (!email.endsWith('@dgsw.hs.kr')) {
           return done(null, false, { message: '@dgsw.hs.kr 이메일만 사용할 수 있습니다.' });
@@ -41,7 +42,13 @@ passport.use(
             data: {
               email,
               name: profile.displayName,
+              last_login_at: loginTimestamp,
             },
+          });
+        } else {
+          user = await prisma.user.update({
+            where: { id: user.id },
+            data: { last_login_at: loginTimestamp },
           });
         }
 

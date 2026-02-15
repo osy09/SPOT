@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -139,24 +139,29 @@ export default function Home() {
     }, DOWNLOAD_TIMEOUT_MS);
   };
 
+  const filteredSchedule = useMemo(() => {
+    if (!isTomorrowDisplay || !wakeupDisplayDate) {
+      return schedule;
+    }
+    return schedule.filter((song) => toKstDateKey(song.play_date) !== wakeupDisplayDate);
+  }, [isTomorrowDisplay, wakeupDisplayDate, schedule]);
+
+  const grouped = useMemo(() => {
+    const groupedByDate = {};
+    for (const song of filteredSchedule) {
+      const dateKey = new Date(song.play_date).toLocaleDateString('ko-KR', {
+        month: 'long',
+        day: 'numeric',
+        weekday: 'short',
+      });
+      if (!groupedByDate[dateKey]) groupedByDate[dateKey] = [];
+      groupedByDate[dateKey].push(song);
+    }
+    return groupedByDate;
+  }, [filteredSchedule]);
+
   if (loading) {
     return <div className="flex justify-center py-20 cu-empty">로딩 중...</div>;
-  }
-
-  const filteredSchedule = isTomorrowDisplay && wakeupDisplayDate
-    ? schedule.filter((song) => toKstDateKey(song.play_date) !== wakeupDisplayDate)
-    : schedule;
-
-  // Group schedule by date
-  const grouped = {};
-  for (const song of filteredSchedule) {
-    const dateKey = new Date(song.play_date).toLocaleDateString('ko-KR', {
-      month: 'long',
-      day: 'numeric',
-      weekday: 'short',
-    });
-    if (!grouped[dateKey]) grouped[dateKey] = [];
-    grouped[dateKey].push(song);
   }
 
   return (
@@ -172,6 +177,7 @@ export default function Home() {
                 key={song.id}
                 song={song}
                 showUser
+                showDate={false}
                 actions={
                   isAdmin && (
                     <button
@@ -204,7 +210,7 @@ export default function Home() {
                 </h3>
                 <div className="space-y-3">
                   {songs.map(song => (
-                    <SongCard key={song.id} song={song} showUser />
+                    <SongCard key={song.id} song={song} showUser showDate={false} />
                   ))}
                 </div>
               </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import api from '../api/client';
@@ -56,13 +56,22 @@ function WakeupQueue() {
   const { showToast } = useToast();
   const minScheduleDateInputValue = getWakeupScheduleMinDateInputValue();
 
-  const load = () => api.get('/api/admin/wakeup/queue').then(r => setSongs(r.data.songs));
-  const loadApproved = () => api.get('/api/songs/schedule').then(r => setApprovedSongs(r.data.songs));
+  const load = useCallback(
+    () => api.get('/api/admin/wakeup/queue').then(r => setSongs(r.data.songs)),
+    []
+  );
+  const loadApproved = useCallback(
+    () => api.get('/api/songs/schedule').then(r => setApprovedSongs(r.data.songs)),
+    []
+  );
+  const refresh = useCallback(
+    () => Promise.all([load(), loadApproved()]),
+    [load, loadApproved]
+  );
 
   useEffect(() => {
-    load();
-    loadApproved();
-  }, []);
+    refresh();
+  }, [refresh]);
 
   const reject = async (id) => {
     if (!confirm('정말 삭제하시겠습니까?')) return;
@@ -70,7 +79,7 @@ function WakeupQueue() {
     try {
       await api.delete(`/api/admin/wakeup/${id}`);
       showToast('기상송이 삭제되었습니다.', 'success');
-      load();
+      await refresh();
     } catch (err) {
       showToast(err.response?.data?.error || '삭제에 실패했습니다.', 'error');
     } finally {
@@ -94,8 +103,7 @@ function WakeupQueue() {
         delete updated[id];
         return updated;
       });
-      load();
-      loadApproved();
+      await refresh();
     } catch (err) {
       showToast(err.response?.data?.error || '스케줄 변경에 실패했습니다.', 'error');
     } finally {
@@ -110,8 +118,7 @@ function WakeupQueue() {
     try {
       await api.patch(`/api/admin/wakeup/${id}/unapprove`);
       showToast('기상송 승인이 취소되었습니다.', 'success');
-      load();
-      loadApproved();
+      await refresh();
     } catch (err) {
       showToast(err.response?.data?.error || '승인 취소에 실패했습니다.', 'error');
     } finally {
@@ -145,7 +152,7 @@ function WakeupQueue() {
                       <button
                         onClick={() => updateSchedule(song.id)}
                         disabled={scheduling === song.id || !selectedDate[song.id]}
-                        className="cu-btn cu-btn-success w-full sm:w-auto"
+                        className="cu-btn cu-btn-primary w-full sm:w-auto"
                       >
                         {scheduling === song.id ? '승인 중...' : '승인'}
                       </button>
@@ -164,7 +171,7 @@ function WakeupQueue() {
           </div>
         )}
         <p className="text-xs mt-3" style={{ color: 'var(--cu-muted)' }}>
-          방송부장은 날짜를 선택하여 즉시 승인할 수 있습니다. 매일 오전 8시(KST)에 상위 2곡이 자동 승인됩니다 (3일 후 재생).
+          매일 오전 8시에 상위 2곡이 자동 승인됩니다.
         </p>
       </div>
 
@@ -222,19 +229,33 @@ function RadioManagement() {
   const [processing, setProcessing] = useState(null);
   const { showToast } = useToast();
 
-  const loadApps = () => api.get('/api/admin/radio/applications').then(r => setApplications(r.data.songs));
-  const loadPlaylist = () => api.get('/api/admin/radio/playlist').then(r => setPlaylist(r.data.songs));
-  const loadYt = () => api.get('/api/admin/youtube/status').then(r => setYtStatus(r.data.connected));
+  const loadApps = useCallback(
+    () => api.get('/api/admin/radio/applications').then(r => setApplications(r.data.songs)),
+    []
+  );
+  const loadPlaylist = useCallback(
+    () => api.get('/api/admin/radio/playlist').then(r => setPlaylist(r.data.songs)),
+    []
+  );
+  const loadYt = useCallback(
+    () => api.get('/api/admin/youtube/status').then(r => setYtStatus(r.data.connected)),
+    []
+  );
+  const refreshRadioData = useCallback(
+    () => Promise.all([loadApps(), loadPlaylist()]),
+    [loadApps, loadPlaylist]
+  );
 
-  useEffect(() => { loadApps(); loadPlaylist(); loadYt(); }, []);
+  useEffect(() => {
+    Promise.all([refreshRadioData(), loadYt()]);
+  }, [refreshRadioData, loadYt]);
 
   const approve = async (id) => {
-    setProcessing(id);
+    setProcessing({ id, action: 'approve' });
     try {
       await api.patch(`/api/admin/radio/${id}/approve`);
       showToast('신청이 승인되었습니다.', 'success');
-      loadApps();
-      loadPlaylist();
+      await refreshRadioData();
     } catch (err) {
       showToast(err.response?.data?.error || '승인에 실패했습니다.', 'error');
     } finally {
@@ -243,11 +264,11 @@ function RadioManagement() {
   };
 
   const reject = async (id) => {
-    setProcessing(id);
+    setProcessing({ id, action: 'reject' });
     try {
       await api.patch(`/api/admin/radio/${id}/reject`);
       showToast('신청이 거절되었습니다.', 'info');
-      loadApps();
+      await refreshRadioData();
     } catch (err) {
       showToast(err.response?.data?.error || '거절에 실패했습니다.', 'error');
     } finally {
@@ -268,8 +289,7 @@ function RadioManagement() {
       } else {
         showToast('승인할 신청이 없습니다.', 'info');
       }
-      loadApps();
-      loadPlaylist();
+      await refreshRadioData();
     } catch (err) {
       showToast(err.response?.data?.error || '일괄 승인에 실패했습니다.', 'error');
     } finally {
@@ -301,7 +321,7 @@ function RadioManagement() {
           <button
             onClick={approveAll}
             disabled={applications.length === 0 || bulkApproving || processing !== null}
-            className="cu-btn cu-btn-success w-full sm:w-auto"
+            className="cu-btn cu-btn-primary w-full sm:w-auto"
           >
             {bulkApproving ? '일괄 승인 중...' : '일괄 승인'}
           </button>
@@ -319,17 +339,17 @@ function RadioManagement() {
                   <div className="flex flex-col gap-1">
                     <button
                       onClick={() => approve(song.id)}
-                      disabled={processing === song.id || bulkApproving}
+                      disabled={processing?.id === song.id || bulkApproving}
                       className="cu-btn cu-btn-success"
                     >
-                      {processing === song.id ? '처리 중...' : '승인'}
+                      {processing?.id === song.id && processing?.action === 'approve' ? '승인 중...' : '승인'}
                     </button>
                     <button
                       onClick={() => reject(song.id)}
-                      disabled={processing === song.id || bulkApproving}
+                      disabled={processing?.id === song.id || bulkApproving}
                       className="cu-btn cu-btn-danger"
                     >
-                      {processing === song.id ? '처리 중...' : '거절'}
+                      {processing?.id === song.id && processing?.action === 'reject' ? '거절 중...' : '거절'}
                     </button>
                   </div>
                 }
@@ -688,6 +708,102 @@ function YoutubeSettings() {
   );
 }
 
+function ApplyNoticeSettings() {
+  const { showToast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState({
+    wakeupPrimary: '',
+    radioPrimary: '',
+    common: '',
+  });
+
+  useEffect(() => {
+    api.get('/api/admin/settings/apply-notice')
+      .then((res) => {
+        setNotice({
+          wakeupPrimary: res.data?.notice?.wakeupPrimary || '',
+          radioPrimary: res.data?.notice?.radioPrimary || '',
+          common: res.data?.notice?.common || '',
+        });
+      })
+      .catch((err) => {
+        showToast(err.response?.data?.error || '신청 안내사항을 불러오는데 실패했습니다.', 'error');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [showToast]);
+
+  const handleChange = (key, value) => {
+    setNotice((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await api.patch('/api/admin/settings/apply-notice', notice);
+      setNotice(res.data.notice);
+      showToast(res.data.message || '저장되었습니다.', 'success');
+    } catch (err) {
+      showToast(err.response?.data?.error || '저장에 실패했습니다.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <p className="cu-empty">안내사항을 불러오는 중...</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold">노래신청 안내사항 관리</h3>
+      <div className="cu-card space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">기상송 안내 문구</label>
+          <textarea
+            value={notice.wakeupPrimary}
+            onChange={(e) => handleChange('wakeupPrimary', e.target.value)}
+            maxLength={200}
+            rows={2}
+            className="cu-input resize-y min-h-20"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">점심방송 안내 문구</label>
+          <textarea
+            value={notice.radioPrimary}
+            onChange={(e) => handleChange('radioPrimary', e.target.value)}
+            maxLength={200}
+            rows={2}
+            className="cu-input resize-y min-h-20"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">공통 안내 문구</label>
+          <textarea
+            value={notice.common}
+            onChange={(e) => handleChange('common', e.target.value)}
+            maxLength={200}
+            rows={2}
+            className="cu-input resize-y min-h-20"
+          />
+        </div>
+        <div className="flex justify-end">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="cu-btn cu-btn-primary w-full sm:w-auto"
+          >
+            {saving ? '저장 중...' : '안내사항 저장'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Admin() {
   const { user } = useAuth();
   const isLeader = user?.role === 'LEADER';
@@ -697,9 +813,10 @@ export default function Admin() {
   const leaderTabs = [
     { id: 'wakeup', label: '기상송' },
     { id: 'radio', label: '점심방송' },
-    { id: 'audit', label: '감사' },
     { id: 'users', label: '사용자 관리' },
     { id: 'youtube', label: 'YouTube' },
+    { id: 'applyNotice', label: '신청 안내' },
+    { id: 'audit', label: '감사' },
   ];
 
   return (
@@ -731,6 +848,7 @@ export default function Admin() {
       {activeTab === 'audit' && isLeader && <AuditLogs />}
       {activeTab === 'users' && isLeader && <UserManagement />}
       {activeTab === 'youtube' && isLeader && <YoutubeSettings />}
+      {activeTab === 'applyNotice' && isLeader && <ApplyNoticeSettings />}
     </div>
   );
 }

@@ -1,13 +1,14 @@
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
-const SQLiteStore = require('connect-sqlite3')(session);
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const passport = require('./config/passport');
 const { startScheduler } = require('./lib/scheduler');
 const { auditLogger } = require('./middleware/audit');
+const prisma = require('./lib/prisma');
+const { PrismaSessionStore } = require('./lib/prisma-session-store');
 
 const authRoutes = require('./routes/auth.routes');
 const songRoutes = require('./routes/song.routes');
@@ -76,10 +77,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(session({
-  store: new SQLiteStore({
-    db: 'sessions.db',
-    dir: './prisma',
-  }),
+  store: new PrismaSessionStore(prisma),
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
@@ -110,6 +108,4 @@ app.get('/api/health', (req, res) => {
 // Start scheduler
 startScheduler();
 
-app.listen(PORT, () => {
-  console.log(`[Server] SPOT Backend running on http://localhost:${PORT}`);
-});
+app.listen(PORT);

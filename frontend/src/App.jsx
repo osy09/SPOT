@@ -3,7 +3,6 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import Navbar from './components/Navbar';
-import PWAInstallPrompt from './components/PWAInstallPrompt';
 
 const Home = lazy(() => import('./pages/Home'));
 const Apply = lazy(() => import('./pages/Apply'));
@@ -48,7 +47,6 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
-        <PWAInstallPrompt />
       </div>
     </ToastProvider>
   );

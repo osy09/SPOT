@@ -1,4 +1,4 @@
-export default function SongCard({ song, showUser, actions }) {
+export default function SongCard({ song, showUser, actions, showDate = true }) {
   return (
     <div className="cu-card flex flex-col sm:flex-row gap-3 sm:gap-4">
       <img
@@ -20,7 +20,7 @@ export default function SongCard({ song, showUser, actions }) {
         {showUser && song.user && (
           <p className="text-xs mt-1" style={{ color: 'var(--cu-muted)' }}>{song.user.name}</p>
         )}
-        {song.play_date && (
+        {showDate && song.play_date && (
           <p className="text-xs mt-1" style={{ color: 'var(--cu-accent)' }}>
             {new Date(song.play_date).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
           </p>

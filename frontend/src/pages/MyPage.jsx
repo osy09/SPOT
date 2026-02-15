@@ -1,8 +1,37 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import api from '../api/client';
 import SongCard from '../components/SongCard';
+
+function formatLastLogin(value) {
+  if (!value) return '기록 없음';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '기록 없음';
+  const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+  const kst = new Date(date.getTime() + KST_OFFSET_MS);
+  const pad = (n) => String(n).padStart(2, '0');
+
+  return `${kst.getUTCFullYear()}-${pad(kst.getUTCMonth() + 1)}-${pad(kst.getUTCDate())} ${pad(kst.getUTCHours())}:${pad(kst.getUTCMinutes())}:${pad(kst.getUTCSeconds())}`;
+}
+
+const roleLabels = {
+  USER: '학생',
+  MEMBER: '방송부원',
+  LEADER: '방송부장',
+};
+
+const statusLabels = {
+  PENDING: '대기중',
+  APPROVED: '승인됨',
+  REJECTED: '거절됨',
+  PLAYED: '재생됨',
+};
+
+const typeLabels = {
+  WAKEUP: '기상송',
+  RADIO: '점심방송',
+};
 
 export default function MyPage() {
   const { user } = useAuth();
@@ -15,37 +44,22 @@ export default function MyPage() {
     api.get('/api/songs/my').then(r => setSongs(r.data.songs));
   }, []);
 
-  const roleLabels = {
-    USER: '학생',
-    MEMBER: '방송부원',
-    LEADER: '방송부장',
-  };
+  const filteredSongs = useMemo(() => {
+    if (filter === 'all') return songs;
+    if (filter === 'wakeup') return songs.filter((song) => song.type === 'WAKEUP');
+    if (filter === 'radio') return songs.filter((song) => song.type === 'RADIO');
+    return songs;
+  }, [filter, songs]);
 
-  const statusLabels = {
-    PENDING: '대기중',
-    APPROVED: '승인됨',
-    REJECTED: '거절됨',
-    PLAYED: '재생됨',
-  };
-
-  const typeLabels = {
-    WAKEUP: '기상송',
-    RADIO: '점심방송',
-  };
-
-  const filteredSongs = songs.filter(song => {
-    if (filter === 'all') return true;
-    if (filter === 'wakeup') return song.type === 'WAKEUP';
-    if (filter === 'radio') return song.type === 'RADIO';
-    return true;
-  });
-
-  const stats = {
-    total: songs.length,
-    wakeup: songs.filter(s => s.type === 'WAKEUP').length,
-    radio: songs.filter(s => s.type === 'RADIO').length,
-    approved: songs.filter(s => s.status === 'APPROVED' || s.status === 'PLAYED').length,
-  };
+  const stats = useMemo(
+    () => ({
+      total: songs.length,
+      wakeup: songs.filter((s) => s.type === 'WAKEUP').length,
+      radio: songs.filter((s) => s.type === 'RADIO').length,
+      approved: songs.filter((s) => s.status === 'APPROVED' || s.status === 'PLAYED').length,
+    }),
+    [songs]
+  );
 
   const cancelSong = async (songId) => {
     if (!confirm('대기중인 신청을 취소하시겠습니까?')) return;
@@ -103,14 +117,14 @@ export default function MyPage() {
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
             <span className="text-sm sm:w-20" style={{ color: 'var(--cu-muted)' }}>역할</span>
-            <span className="cu-badge cu-badge-info text-sm">
+            <span className="text-sm font-medium">
               {roleLabels[user?.role] || user?.role}
             </span>
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
             <span className="text-sm sm:w-20" style={{ color: 'var(--cu-muted)' }}>상태</span>
-            <span className={`cu-badge ${user?.is_blacklisted ? 'cu-badge-danger' : 'cu-badge-success'}`}>
-              {user?.is_blacklisted ? '차단됨' : '정상'}
+            <span className="text-sm font-medium">
+              {`${user?.is_blacklisted ? '차단됨' : '정상'} (최근로그인 : ${formatLastLogin(user?.last_login_at)})`}
             </span>
           </div>
         </div>
