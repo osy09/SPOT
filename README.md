@@ -146,6 +146,10 @@ docker-compose build
 docker-compose up -d
 ```
 
+문제 해결 팁:
+- `Error relocating ... @libsql/linux-x64-musl ... fcntl64: symbol not found` 에러가 나면 Alpine(musl) 이미지 호환 이슈입니다.
+- 현재 백엔드는 `node:20-bookworm-slim`(glibc) 기반으로 구성되어 있으므로, 이미지 캐시를 비우고 재빌드하세요.
+
 - Frontend: `http://localhost:3000`
 - Backend(API): Frontend를 통해 `/auth`, `/api` 프록시 접근
 

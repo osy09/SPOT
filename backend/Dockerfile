@@ -1,9 +1,11 @@
-FROM node:20-alpine
+FROM node:20-bookworm-slim
 
 WORKDIR /app
 
 # Required for YouTube audio extraction/transcoding
-RUN apk add --no-cache ffmpeg yt-dlp
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ffmpeg yt-dlp \
+  && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
