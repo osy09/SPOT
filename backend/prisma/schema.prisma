@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             Int     @id @default(autoincrement())
+  email          String  @unique
+  name           String
+  role           String  @default("USER") // USER, MEMBER, LEADER
+  is_blacklisted Boolean @default(false)
+  created_at     String  @default(dbgenerated("(datetime('now', 'localtime'))"))
+  songs          Song[]
+  audit_logs     AuditLog[]
+}
+
+model Song {
+  id           Int       @id @default(autoincrement())
+  user_id      Int
+  type         String    // WAKEUP, RADIO
+  youtube_url  String
+  video_id     String
+  title        String
+  channel_name String
+  story        String?
+  is_anonymous Boolean   @default(false)
+  status       String    @default("PENDING") // PENDING, APPROVED, REJECTED, PLAYED
+  play_date    DateTime?
+  created_at   DateTime  @default(now())
+  user         User      @relation(fields: [user_id], references: [id])
+}
+
+model SystemToken {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value String
+}
+
+model AuditLog {
+  id            Int      @id @default(autoincrement())
+  user_id       Int?
+  user_email    String?
+  user_name     String?
+  user_role     String?
+  method        String
+  path          String
+  status_code   Int
+  ip            String?
+  user_agent    String?
+  request_query String?
+  request_body  String?
+  duration_ms   Int?
+  created_at    DateTime @default(now())
+  user          User?    @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@index([created_at])
+  @@index([user_id])
+}

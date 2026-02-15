@@ -1,0 +1,35 @@
+{
+  "name": "spot-broadcasting-system",
+  "version": "1.0.0",
+  "description": "DGSw Broadcasting System - 대구소프트웨어마이스터고 방송부 웹 서비스",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "npm run build:frontend",
+    "build:frontend": "cd frontend && npm run build",
+    "db:studio": "cd backend && npx prisma studio",
+    "db:migrate": "cd backend && npx prisma migrate dev",
+    "db:generate": "cd backend && npx prisma generate",
+    "db:reset": "cd backend && npx prisma migrate reset",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "setup": "./scripts/dev-setup.sh",
+    "setup:docker": "./scripts/docker-setup.sh"
+  },
+  "keywords": [
+    "broadcasting",
+    "school",
+    "youtube",
+    "playlist",
+    "music"
+  ],
+  "author": "DGSw Broadcasting Department",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}
