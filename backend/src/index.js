@@ -1,9 +1,14 @@
 require('dotenv').config();
+
+// 모든 날짜 연산을 위해 타임존을 Asia/Seoul로 설정
+process.env.TZ = 'Asia/Seoul';
+
 const express = require('express');
 const session = require('express-session');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const crypto = require('crypto');
 const passport = require('./config/passport');
 const { startScheduler } = require('./lib/scheduler');
 const { auditLogger } = require('./middleware/audit');
@@ -19,93 +24,159 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Trust proxy - required for Cloudflare Tunnel and secure cookies
+// 프록시 신뢰 설정 - Cloudflare Tunnel 및 보안 쿠키에 필요
 app.set('trust proxy', 1);
 
-// Validate required environment variables
+// 필수 환경 변수 검증
 if (!process.env.SESSION_SECRET) {
-  console.error('[CRITICAL] SESSION_SECRET environment variable is required');
+  console.error('[심각] SESSION_SECRET 환경 변수가 필요합니다');
   process.exit(1);
 }
 
-// Security headers with Helmet
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles for popup windows
-      scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts for OAuth popup windows
-      imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'"],
-      frameSrc: ["'none'"],
-      objectSrc: ["'none'"],
-    },
-  },
-  hsts: {
-    maxAge: 31536000, // 1 year
-    includeSubDomains: true,
-    preload: true,
-  },
-  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-}));
+// 각 요청마다 CSP nonce 생성
+app.use((_req, res, next) => {
+  res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
+  next();
+});
 
-// Rate limiting for authentication endpoints
+// Helmet을 사용한 보안 헤더 설정 - unsafe-inline 없이 개선된 CSP
+app.use((_req, res, next) => {
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`],
+        scriptSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`, "https://accounts.google.com"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'", "https://accounts.google.com"],
+        frameSrc: ["https://accounts.google.com"], // Google OAuth 팝업용
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+    hsts: {
+      maxAge: 31536000, // 1년
+      includeSubDomains: true,
+      preload: true,
+    },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    noSniff: true,
+    xssFilter: true,
+  })(_req, res, next);
+});
+
+// 인증 엔드포인트 Rate Limiting - 보안 강화됨
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5000, // Limit each IP to 50 requests per 15 minutes (relaxed for testing)
+  windowMs: 15 * 60 * 1000, // 15분
+  max: 50, // 각 IP당 15분에 50회로 제한
   message: { error: '너무 많은 로그인 시도가 있었습니다. 잠시 후 다시 시도해주세요.' },
   standardHeaders: true,
   legacyHeaders: false,
+  skipSuccessfulRequests: false,
 });
 
-// Rate limiting for API endpoints
+// API 엔드포인트 Rate Limiting - 보안 강화됨
 const apiLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 30000, // Limit each IP to 300 requests per minute (relaxed for initial deployment)
+  windowMs: 1 * 60 * 1000, // 1분
+  max: 300, // 각 IP당 1분에 300회로 제한
   message: { error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-// Apply rate limiting
+// Rate Limiting 적용
 app.use('/auth', authLimiter);
 app.use('/api', apiLimiter);
 
+// 화이트리스트 기반 CORS 설정 - 보안 강화됨
+const allowedOrigins = [
+  'https://spot.dgsw.site',
+  process.env.FRONTEND_URL,
+  // 개발 환경에서만 localhost 허용
+  !isProduction && 'http://localhost:5173',
+  !isProduction && 'http://localhost:5174',
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // origin이 없는 요청(모바일 앱, Postman 등)은 개발 환경에서만 허용
+    if (!origin && !isProduction) {
+      return callback(null, true);
+    }
+
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`[CORS] 차단된 origin: ${origin}`);
+      callback(new Error('CORS에 의해 허용되지 않음'));
+    }
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 86400, // 24시간
 }));
-app.use(express.json());
+
+app.use(express.json({ limit: '1mb' })); // DoS 방지를 위한 body 크기 제한
 app.use(session({
   store: new PrismaSessionStore(prisma),
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: isProduction, // HTTPS only in production
-    httpOnly: true, // Prevent XSS attacks
-    sameSite: 'lax', // CSRF protection (use 'strict' if no cross-site requests needed)
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    secure: isProduction, // 프로덕션에서만 HTTPS 강제
+    httpOnly: true, // XSS 공격 방지
+    sameSite: 'lax', // CSRF 보호 (교차 사이트 요청이 필요 없다면 'strict' 사용)
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
   },
+  name: 'spot.sid', // 커스텀 세션 쿠키 이름
+  rolling: true, // 각 요청마다 만료 시간 갱신
 }));
 app.use(passport.initialize());
 app.use(passport.session());
 app.use(auditLogger);
 
-// Routes
+// 라우트 등록
 app.use('/auth', authRoutes);
 app.use('/api/songs', songRoutes);
 app.use('/api/admin', adminRoutes);
 
-// YouTube OAuth callback (public endpoint)
+// YouTube OAuth 콜백 (공개 엔드포인트)
 app.get('/api/youtube/callback', youtubeCallback);
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
+// 헬스 체크
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    timezone: process.env.TZ || 'UTC',
+  });
 });
 
-// Start scheduler
+// 에러 처리 미들웨어
+app.use((err, _req, res, _next) => {
+  console.error('[오류]', err.message);
+
+  // 프로덕션에서는 에러 상세 정보 숨김
+  if (isProduction) {
+    res.status(err.status || 500).json({
+      error: '서버 오류가 발생했습니다.'
+    });
+  } else {
+    res.status(err.status || 500).json({
+      error: err.message,
+      stack: err.stack
+    });
+  }
+});
+
+// 스케줄러 시작
 startScheduler();
 
-app.listen(PORT);
+app.listen(PORT, () => {
+  console.log(`[서버] 포트 ${PORT}에서 실행 중`);
+  console.log(`[서버] 환경: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`[서버] 타임존: ${process.env.TZ || 'UTC'}`);
+});

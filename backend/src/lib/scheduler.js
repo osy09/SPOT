@@ -8,6 +8,11 @@ const {
   kstDateToUtcDate,
 } = require('./kst-time');
 
+/**
+ * 만료된 곡 정리
+ * - 오늘 이전 날짜의 APPROVED 상태 기상송 삭제
+ * - 7일 이전에 거절된 곡 삭제
+ */
 async function cleanupExpiredSongs(now = new Date()) {
   const todayKstDate = getKstDate(now);
   const { start: todayStartUtc } = getKstDayRange(todayKstDate);
@@ -32,8 +37,31 @@ async function cleanupExpiredSongs(now = new Date()) {
   ]);
 }
 
+/**
+ * 데이터베이스에서 만료된 세션 정리
+ * expires_at < now 인 세션 삭제
+ */
+async function cleanupExpiredSessions() {
+  try {
+    const result = await prisma.session.deleteMany({
+      where: {
+        expires_at: { lt: new Date() },
+      },
+    });
+
+    if (result.count > 0) {
+      console.log(`[세션 정리] ${result.count}개의 만료된 세션 삭제됨`);
+    }
+  } catch (error) {
+    console.error('[세션 정리 오류]', error.message);
+  }
+}
+
+/**
+ * 크론 작업 시작
+ */
 function startScheduler() {
-  // Run every day at 08:00 KST
+  // 매일 08:00 KST에 실행 - 기상송 자동 승인
   cron.schedule('0 8 * * *', async () => {
     try {
       const todayKst = getKstDate();
@@ -68,23 +96,47 @@ function startScheduler() {
         });
       }
     } catch (err) {
-      console.error('[Scheduler] Error:', err);
+      console.error('[스케줄러] 오류:', err);
     }
   }, { timezone: KST_TIMEZONE });
 
-  // Run every hour at minute 10 (KST)
+  // 매 시간 10분에 실행 (KST) - 만료된 곡 정리
   cron.schedule('10 * * * *', async () => {
     try {
       await cleanupExpiredSongs();
     } catch (err) {
-      console.error('[Scheduler] Cleanup Error:', err);
+      console.error('[스케줄러] 곡 정리 오류:', err);
     }
   }, { timezone: KST_TIMEZONE });
 
-  // Run once on startup for immediate consistency
+  // 매일 03:00 KST에 실행 - 만료된 세션 정리
+  cron.schedule('0 3 * * *', async () => {
+    try {
+      await cleanupExpiredSessions();
+    } catch (err) {
+      console.error('[스케줄러] 세션 정리 오류:', err);
+    }
+  }, { timezone: KST_TIMEZONE });
+
+  // 6시간마다 실행 - 추가 세션 정리 (안전장치)
+  cron.schedule('0 */6 * * *', async () => {
+    try {
+      await cleanupExpiredSessions();
+    } catch (err) {
+      console.error('[스케줄러] 세션 정리 오류:', err);
+    }
+  }, { timezone: KST_TIMEZONE });
+
+  // 시작 시 한 번 실행하여 즉시 일관성 확보
   cleanupExpiredSongs().catch((err) => {
-    console.error('[Scheduler] Startup Cleanup Error:', err);
+    console.error('[스케줄러] 시작 시 곡 정리 오류:', err);
   });
+
+  cleanupExpiredSessions().catch((err) => {
+    console.error('[스케줄러] 시작 시 세션 정리 오류:', err);
+  });
+
+  console.log('[스케줄러] 크론 작업이 성공적으로 시작되었습니다');
 }
 
 module.exports = { startScheduler };

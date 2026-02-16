@@ -100,71 +100,91 @@ async function applyWakeup(req, res) {
   if (!parsedRequest) return;
   const { youtube_url, video_id } = parsedRequest;
 
-  // USER role can apply only one wake-up song per day (midnight 기준, KST)
-  if (req.user.role === 'USER') {
-    const todayKst = getKstDate();
-    const { start: dayStart, end: dayEnd } = getKstDayRange(todayKst);
-
-    const alreadyAppliedToday = await prisma.song.findFirst({
-      where: {
-        user_id: req.user.id,
-        type: 'WAKEUP',
-        created_at: { gte: dayStart, lt: dayEnd },
-      },
-      select: { id: true },
-    });
-
-    if (alreadyAppliedToday) {
-      return res.status(400).json({ error: '하루에 1곡까지 신청할 수 있습니다.' });
-    }
-  }
-
   const info = await fetchVideoInfo(video_id);
   if (!info) {
     return res.status(400).json({ error: '영상 정보를 가져올 수 없습니다.' });
   }
 
-  // Check if already in queue (PENDING or APPROVED)
-  const inQueue = await prisma.song.findFirst({
-    where: {
-      video_id,
-      type: 'WAKEUP',
-      status: { in: ['PENDING', 'APPROVED'] },
-    },
-  });
+  try {
+    // Race Condition 방지를 위해 트랜잭션 사용
+    const result = await prisma.$transaction(async (tx) => {
+      // USER 역할은 하루에 기상송 1곡만 신청 가능 (자정 기준, KST)
+      if (req.user.role === 'USER') {
+        const todayKst = getKstDate();
+        const { start: dayStart, end: dayEnd } = getKstDayRange(todayKst);
 
-  if (inQueue) {
-    return res.status(400).json({ error: '이미 대기열에 있는 노래입니다.' });
+        const todayCount = await tx.song.count({
+          where: {
+            user_id: req.user.id,
+            type: 'WAKEUP',
+            created_at: { gte: dayStart, lt: dayEnd },
+          },
+        });
+
+        if (todayCount > 0) {
+          throw new Error('하루에 1곡까지 신청할 수 있습니다.');
+        }
+      }
+
+      // 대기열에 이미 있는지 확인 (PENDING 또는 APPROVED)
+      const inQueue = await tx.song.findFirst({
+        where: {
+          video_id,
+          type: 'WAKEUP',
+          status: { in: ['PENDING', 'APPROVED'] },
+        },
+        select: { id: true },
+      });
+
+      if (inQueue) {
+        throw new Error('이미 대기열에 있는 노래입니다.');
+      }
+
+      // 중복 확인: 최근 7일 이내 재생 여부
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const recent = await tx.song.findFirst({
+        where: {
+          video_id,
+          type: 'WAKEUP',
+          status: 'PLAYED',
+          play_date: { gte: sevenDaysAgo },
+        },
+        select: { id: true },
+      });
+
+      // 트랜잭션 내에서 곡 생성
+      const song = await tx.song.create({
+        data: {
+          user_id: req.user.id,
+          type: 'WAKEUP',
+          youtube_url,
+          video_id,
+          title: info.title,
+          channel_name: info.channel_name,
+          status: 'PENDING',
+        },
+      });
+
+      return {
+        song,
+        hasRecentPlay: !!recent,
+      };
+    });
+
+    res.json({
+      song: sanitizeSong(result.song),
+      warning: result.hasRecentPlay ? '이 곡은 최근 7일 이내에 재생된 적이 있습니다.' : null,
+    });
+  } catch (error) {
+    // 트랜잭션 에러 처리
+    if (error.message === '하루에 1곡까지 신청할 수 있습니다.' ||
+        error.message === '이미 대기열에 있는 노래입니다.') {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('[기상송 신청 오류]', error.message);
+    return res.status(500).json({ error: '신청 처리 중 오류가 발생했습니다.' });
   }
-
-  // Duplicate check: played in last 7 days
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const recent = await prisma.song.findFirst({
-    where: {
-      video_id,
-      type: 'WAKEUP',
-      status: 'PLAYED',
-      play_date: { gte: sevenDaysAgo },
-    },
-  });
-
-  const song = await prisma.song.create({
-    data: {
-      user_id: req.user.id,
-      type: 'WAKEUP',
-      youtube_url,
-      video_id,
-      title: info.title,
-      channel_name: info.channel_name,
-      status: 'PENDING',
-    },
-  });
-
-  res.json({
-    song: sanitizeSong(song),
-    warning: recent ? '이 곡은 최근 7일 이내에 재생된 적이 있습니다.' : null,
-  });
 }
 
 async function applyRadio(req, res) {
@@ -182,36 +202,50 @@ async function applyRadio(req, res) {
     return res.status(400).json({ error: '영상 정보를 가져올 수 없습니다.' });
   }
 
-  // Check if already in today's queue (PENDING or APPROVED)
-  const todayKst = getKstDate();
-  const { start: dayStart, end: dayEnd } = getKstDayRange(todayKst);
+  try {
+    // Race Condition 방지를 위해 트랜잭션 사용
+    const song = await prisma.$transaction(async (tx) => {
+      // 오늘 대기열에 이미 있는지 확인 (PENDING 또는 APPROVED)
+      const todayKst = getKstDate();
+      const { start: dayStart, end: dayEnd } = getKstDayRange(todayKst);
 
-  const inQueue = await prisma.song.findFirst({
-    where: {
-      video_id,
-      type: 'RADIO',
-      status: { in: ['PENDING', 'APPROVED'] },
-      created_at: { gte: dayStart, lt: dayEnd },
-    },
-  });
+      const inQueue = await tx.song.findFirst({
+        where: {
+          video_id,
+          type: 'RADIO',
+          status: { in: ['PENDING', 'APPROVED'] },
+          created_at: { gte: dayStart, lt: dayEnd },
+        },
+        select: { id: true },
+      });
 
-  if (inQueue) {
-    return res.status(400).json({ error: '이미 오늘 대기열에 있는 노래입니다.' });
+      if (inQueue) {
+        throw new Error('이미 오늘 대기열에 있는 노래입니다.');
+      }
+
+      // 트랜잭션 내에서 곡 생성
+      return await tx.song.create({
+        data: {
+          user_id: req.user.id,
+          type: 'RADIO',
+          youtube_url,
+          video_id,
+          title: info.title,
+          channel_name: info.channel_name,
+          status: 'PENDING',
+        },
+      });
+    });
+
+    res.json({ song: sanitizeSong(song) });
+  } catch (error) {
+    // 트랜잭션 에러 처리
+    if (error.message === '이미 오늘 대기열에 있는 노래입니다.') {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('[점심방송 신청 오류]', error.message);
+    return res.status(500).json({ error: '신청 처리 중 오류가 발생했습니다.' });
   }
-
-  const song = await prisma.song.create({
-    data: {
-      user_id: req.user.id,
-      type: 'RADIO',
-      youtube_url,
-      video_id,
-      title: info.title,
-      channel_name: info.channel_name,
-      status: 'PENDING',
-    },
-  });
-
-  res.json({ song: sanitizeSong(song) });
 }
 
 async function getSchedule(req, res) {
@@ -280,7 +314,7 @@ async function getMySongs(req, res) {
     });
     res.json({ songs: sanitizeSongs(songs) });
   } catch (error) {
-    console.error('[Get My Songs Error]', error.message);
+    console.error('[내 신청 곡 조회 오류]', error.message);
     res.status(500).json({ error: '신청 기록을 불러오는데 실패했습니다.' });
   }
 }
@@ -323,7 +357,7 @@ async function searchYoutube(req, res) {
 
     // YouTube Data API Key가 없으면 오류 반환
     if (!process.env.YOUTUBE_API_KEY) {
-      console.error('[YouTube Search] YOUTUBE_API_KEY is not configured');
+      console.error('[YouTube 검색] YOUTUBE_API_KEY가 설정되지 않음');
       return res.status(500).json({ error: 'YouTube 검색 기능이 설정되지 않았습니다.' });
     }
 
@@ -337,7 +371,7 @@ async function searchYoutube(req, res) {
       q: queryText,
       type: ['video'],
       maxResults: 10,
-      videoCategoryId: '10', // Music category
+      videoCategoryId: '10', // 음악 카테고리
       regionCode: 'KR',
     });
 
@@ -351,7 +385,7 @@ async function searchYoutube(req, res) {
 
     res.json({ results });
   } catch (error) {
-    console.error('[YouTube Search Error]', error.message);
+    console.error('[YouTube 검색 오류]', error.message);
     const statusCode = error?.response?.status || Number(error?.code);
     if (statusCode === 403) {
       return res.status(403).json({ error: 'YouTube API 할당량이 초과되었습니다.' });

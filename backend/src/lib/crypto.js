@@ -1,26 +1,26 @@
 const crypto = require('crypto');
 
-// Encryption configuration
+// 암호화 설정
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
 const SALT_LENGTH = 64;
 
 /**
- * Derives an encryption key from the provided secret using PBKDF2
+ * PBKDF2를 사용하여 제공된 시크릿에서 암호화 키 파생
  */
 function deriveKey(secret, salt) {
   return crypto.pbkdf2Sync(secret, salt, 100000, 32, 'sha256');
 }
 
 /**
- * Encrypts sensitive data (like refresh tokens)
- * @param {string} text - The plaintext to encrypt
- * @returns {string} - Encrypted data in format: salt:iv:authTag:encryptedData (all hex-encoded)
+ * 민감한 데이터 암호화 (refresh token 등)
+ * @param {string} text - 암호화할 평문
+ * @returns {string} - 형식의 암호화된 데이터: salt:iv:authTag:encryptedData (모두 hex 인코딩)
  */
 function encrypt(text) {
   if (!process.env.ENCRYPTION_KEY) {
-    throw new Error('ENCRYPTION_KEY environment variable is required for token encryption');
+    throw new Error('토큰 암호화를 위해 ENCRYPTION_KEY 환경 변수가 필요합니다');
   }
 
   const salt = crypto.randomBytes(SALT_LENGTH);
@@ -34,23 +34,23 @@ function encrypt(text) {
 
   const authTag = cipher.getAuthTag();
 
-  // Format: salt:iv:authTag:encryptedData
+  // 형식: salt:iv:authTag:encryptedData
   return `${salt.toString('hex')}:${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
 }
 
 /**
- * Decrypts encrypted data
- * @param {string} encryptedData - The encrypted data in format: salt:iv:authTag:encryptedData
- * @returns {string} - The decrypted plaintext
+ * 암호화된 데이터 복호화
+ * @param {string} encryptedData - 형식의 암호화된 데이터: salt:iv:authTag:encryptedData
+ * @returns {string} - 복호화된 평문
  */
 function decrypt(encryptedData) {
   if (!process.env.ENCRYPTION_KEY) {
-    throw new Error('ENCRYPTION_KEY environment variable is required for token decryption');
+    throw new Error('토큰 복호화를 위해 ENCRYPTION_KEY 환경 변수가 필요합니다');
   }
 
   const parts = encryptedData.split(':');
   if (parts.length !== 4) {
-    throw new Error('Invalid encrypted data format');
+    throw new Error('유효하지 않은 암호화된 데이터 형식');
   }
 
   const salt = Buffer.from(parts[0], 'hex');

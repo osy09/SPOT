@@ -374,12 +374,20 @@ async function downloadTodayWakeup(req, res) {
 
     const { videoId } = req.params;
     const { downloadToken } = req.query;
+
+    // Additional security: verify videoId format (defense in depth)
+    // This is already validated by middleware, but double-check for safety
+    if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+      return res.status(400).json({ error: '유효하지 않은 비디오 ID입니다.' });
+    }
+
     const song = songs.find(s => s.video_id === videoId);
 
     if (!song) {
       return res.status(404).json({ error: '해당 곡을 찾을 수 없습니다.' });
     }
 
+    // Construct URL safely - videoId is now guaranteed to be safe
     const url = `https://www.youtube.com/watch?v=${videoId}`;
 
     const sanitizedTitle = song.title.replace(/[<>:"/\\|?*]/g, '_');

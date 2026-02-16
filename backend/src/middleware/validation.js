@@ -1,9 +1,9 @@
 /**
- * Input validation middleware for API endpoints
+ * API 엔드포인트를 위한 입력 검증 미들웨어
  */
 
 /**
- * Validates numeric ID parameters
+ * 숫자 ID 파라미터 검증
  */
 function validateIdParam(paramName = 'id') {
   return (req, res, next) => {
@@ -13,14 +13,14 @@ function validateIdParam(paramName = 'id') {
       return res.status(400).json({ error: '유효하지 않은 ID입니다.' });
     }
 
-    // Store parsed ID for use in controllers
+    // 컨트롤러에서 사용할 파싱된 ID 저장
     req.validatedId = id;
     next();
   };
 }
 
 /**
- * Validates video ID format (YouTube video IDs are 11 characters)
+ * 비디오 ID 형식 검증 (YouTube 비디오 ID는 11자)
  */
 function validateVideoId(req, res, next) {
   const { videoId } = req.params;
@@ -29,7 +29,7 @@ function validateVideoId(req, res, next) {
     return res.status(400).json({ error: '유효하지 않은 비디오 ID입니다.' });
   }
 
-  // Additional check for valid YouTube video ID characters
+  // YouTube 비디오 ID에 유효한 문자인지 추가 확인
   if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
     return res.status(400).json({ error: '유효하지 않은 비디오 ID 형식입니다.' });
   }
@@ -38,7 +38,7 @@ function validateVideoId(req, res, next) {
 }
 
 /**
- * Validates role update requests
+ * 역할 업데이트 요청 검증
  */
 function validateRoleUpdate(req, res, next) {
   const { role } = req.body;
@@ -55,12 +55,12 @@ function validateRoleUpdate(req, res, next) {
 }
 
 /**
- * Validates playlist export request
+ * 재생목록 내보내기 요청 검증
  */
 function validatePlaylistExport(req, res, next) {
   const { songIds, title } = req.body;
 
-  // Validate songIds
+  // songIds 검증
   if (!Array.isArray(songIds)) {
     return res.status(400).json({ error: 'songIds는 배열이어야 합니다.' });
   }
@@ -73,7 +73,7 @@ function validatePlaylistExport(req, res, next) {
     return res.status(400).json({ error: '최대 100개까지 선택 가능합니다.' });
   }
 
-  // Validate all songIds are positive integers
+  // 모든 songIds가 양의 정수인지 검증
   const allValid = songIds.every(id => {
     const numId = Number(id);
     return Number.isInteger(numId) && numId > 0;
@@ -83,7 +83,7 @@ function validatePlaylistExport(req, res, next) {
     return res.status(400).json({ error: '유효하지 않은 곡 ID가 포함되어 있습니다.' });
   }
 
-  // Validate title if provided
+  // 제목이 제공된 경우 검증
   if (title !== undefined) {
     if (typeof title !== 'string') {
       return res.status(400).json({ error: '제목은 문자열이어야 합니다.' });
@@ -98,7 +98,7 @@ function validatePlaylistExport(req, res, next) {
 }
 
 /**
- * Prevents LEADER from demoting themselves
+ * LEADER가 자신의 권한을 강등하는 것을 방지
  */
 function preventSelfDemotion(req, res, next) {
   const targetUserId = parseInt(req.params.id, 10);

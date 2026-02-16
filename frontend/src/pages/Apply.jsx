@@ -15,6 +15,7 @@ export default function Apply() {
   const { user } = useAuth();
   const [tab, setTab] = useState('wakeup');
   const [input, setInput] = useState('');
+  const [error, setError] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -80,6 +81,7 @@ export default function Apply() {
   const handleInputChange = async (e) => {
     const value = e.target.value;
     setInput(value);
+    if (error) setError(''); // 입력이 변경되면 에러 메시지 초기화
 
     // URL이 아니고 2글자 이상이면 자동 검색
     clearSearchTimer();
@@ -124,6 +126,7 @@ export default function Apply() {
     clearSearchTimer();
     searchRequestSeqRef.current += 1;
     setInput(song.youtube_url);
+    if (error) setError('');
     setSearchResults([]);
     setSearching(false);
   };
@@ -131,12 +134,15 @@ export default function Apply() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // YouTube URL이 아니면 경고
-    if (!isYouTubeUrl(input)) {
-      showToast('YouTube URL을 입력하거나 검색 결과에서 곡을 선택해주세요.', 'warning');
+    const youtubeUrlRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)[a-zA-Z0-9_-]{11}/;
+    if (!youtubeUrlRegex.test(input)) {
+      const errorMessage = '유효한 YouTube URL을 입력해주세요.';
+      setError(errorMessage);
+      showToast(errorMessage, 'warning');
       return;
     }
 
+    setError(''); // 유효성 검사 통과 시 에러 메시지 초기화
     setLoading(true);
 
     try {
@@ -242,6 +248,7 @@ export default function Apply() {
                 required
                 className="cu-input"
               />
+              {error && <p className="text-xs mt-1.5" style={{ color: 'var(--cu-danger)' }}>{error}</p>}
               {searching && (
                 <div className="absolute right-3 top-9 text-xs cu-empty">
                   검색 중...
