@@ -6,6 +6,7 @@ const {
   getKstDayRange,
   getWakeupDisplayDateKst,
   formatKstDate,
+  addDaysToKstDate,
 } = require('../lib/kst-time');
 const { sanitizeSong, sanitizeSongs } = require('../lib/song-response');
 const { getApplyNotice } = require('../lib/apply-notice');
@@ -293,6 +294,51 @@ async function getTodayWakeup(req, res) {
   });
 }
 
+/**
+ * GET /api/songs/daily
+ * 오늘과 내일의 승인된 기상송 YouTube URL을 반환하는 공개 API.
+ * 외부 웹 플랫폼에 기상송 URL을 제공하기 위해 사용된다.
+ */
+async function getDailyWakeup(req, res) {
+  const todayKst    = getKstDate();
+  const tomorrowKst = addDaysToKstDate(todayKst, 1);
+
+  const { start: todayStart, end: todayEnd }       = getKstDayRange(todayKst);
+  const { start: tomorrowStart, end: tomorrowEnd } = getKstDayRange(tomorrowKst);
+
+  const [todaySongs, tomorrowSongs] = await Promise.all([
+    prisma.song.findMany({
+      where: {
+        type: 'WAKEUP',
+        status: { in: ['APPROVED', 'PLAYED'] },
+        play_date: { gte: todayStart, lt: todayEnd },
+      },
+      select: { youtube_url: true },
+      orderBy: { play_date: 'asc' },
+    }),
+    prisma.song.findMany({
+      where: {
+        type: 'WAKEUP',
+        status: 'APPROVED',
+        play_date: { gte: tomorrowStart, lt: tomorrowEnd },
+      },
+      select: { youtube_url: true },
+      orderBy: { play_date: 'asc' },
+    }),
+  ]);
+
+  res.json({
+    today: {
+      date: formatKstDate(todayKst),
+      urls: todaySongs.map((s) => s.youtube_url),
+    },
+    tomorrow: {
+      date: formatKstDate(tomorrowKst),
+      urls: tomorrowSongs.map((s) => s.youtube_url),
+    },
+  });
+}
+
 async function getWakeupQueue(req, res) {
   const songs = await prisma.song.findMany({
     where: {
@@ -404,6 +450,7 @@ module.exports = {
   applyRadio,
   getSchedule,
   getTodayWakeup,
+  getDailyWakeup,
   getWakeupQueue,
   getMySongs,
   cancelMyPendingSong,

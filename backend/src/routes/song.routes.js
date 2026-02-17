@@ -6,6 +6,7 @@ const {
   applyRadio,
   getSchedule,
   getTodayWakeup,
+  getDailyWakeup,
   getWakeupQueue,
   getMySongs,
   cancelMyPendingSong,
@@ -15,6 +16,7 @@ const {
 
 router.get('/schedule', getSchedule);
 router.get('/today', getTodayWakeup);
+router.get('/daily', getDailyWakeup);
 router.get('/apply-notice', isAuthenticated, getApplyNoticeSettings);
 router.get('/wakeup/queue', isAuthenticated, getWakeupQueue);
 router.get('/my', isAuthenticated, getMySongs);
