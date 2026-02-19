@@ -18,7 +18,7 @@ async function cleanupExpiredSongs(now = new Date()) {
   const { start: todayStartUtc } = getKstDayRange(todayKstDate);
   const rejectedCutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-  await prisma.$transaction([
+  const [deletedApproved, deletedRejected] = await prisma.$transaction([
     prisma.song.deleteMany({
       where: {
         status: 'APPROVED',
@@ -35,6 +35,13 @@ async function cleanupExpiredSongs(now = new Date()) {
       },
     }),
   ]);
+
+  if (deletedApproved.count > 0 || deletedRejected.count > 0) {
+    console.log(
+      `[스케줄러] 만료 곡 정리 (기준일: ${todayStartUtc.toISOString()}) — ` +
+      `APPROVED ${deletedApproved.count}개, REJECTED ${deletedRejected.count}개 삭제됨`
+    );
+  }
 }
 
 /**
@@ -66,6 +73,14 @@ function startScheduler() {
     try {
       const todayKst = getKstDate();
       const targetKstDate = addDaysToKstDate(todayKst, 3);
+
+      // 주말(토·일)에는 기상송을 승인하지 않음
+      const targetUtcDate = new Date(Date.UTC(targetKstDate.year, targetKstDate.month - 1, targetKstDate.day));
+      const dayOfWeek = targetUtcDate.getUTCDay(); // 0=일, 6=토
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        return;
+      }
+
       const playDate = kstDateToUtcDate(targetKstDate, 0, 0, 0, 0);
       const targetEndDate = addDaysToKstDate(targetKstDate, 1);
       const targetEndUtc = kstDateToUtcDate(targetEndDate, 0, 0, 0, 0);
@@ -100,8 +115,8 @@ function startScheduler() {
     }
   }, { timezone: KST_TIMEZONE });
 
-  // 매 시간 10분에 실행 (KST) - 만료된 곡 정리
-  cron.schedule('10 * * * *', async () => {
+  // 매일 08:00 KST에 실행 - 만료된 곡 정리
+  cron.schedule('0 8 * * *', async () => {
     try {
       await cleanupExpiredSongs();
     } catch (err) {

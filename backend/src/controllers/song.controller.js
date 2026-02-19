@@ -127,12 +127,12 @@ async function applyWakeup(req, res) {
         }
       }
 
-      // 대기열에 이미 있는지 확인 (PENDING 또는 APPROVED)
+      // 대기열에 이미 있는지 확인 (PENDING만 - APPROVED는 스케줄 확정 곡이므로 제외)
       const inQueue = await tx.song.findFirst({
         where: {
           video_id,
           type: 'WAKEUP',
-          status: { in: ['PENDING', 'APPROVED'] },
+          status: 'PENDING',
         },
         select: { id: true },
       });
