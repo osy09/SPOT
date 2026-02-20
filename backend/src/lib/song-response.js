@@ -1,18 +1,12 @@
 function sanitizeSong(song) {
-  if (!song || typeof song !== 'object') {
-    return song;
-  }
-
-  const { story, is_anonymous, ...rest } = song;
-  return rest;
+  return song;
 }
 
 function sanitizeSongs(songs) {
   if (!Array.isArray(songs)) {
     return [];
   }
-
-  return songs.map(sanitizeSong);
+  return songs;
 }
 
 module.exports = {

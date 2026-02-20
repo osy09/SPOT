@@ -8,18 +8,12 @@ import SongCard from '../components/SongCard';
 const DOWNLOAD_COOKIE_NAME = 'spot_download_token';
 const DOWNLOAD_POLL_INTERVAL_MS = 250;
 const DOWNLOAD_TIMEOUT_MS = 20000;
-const KST_DATE_KEY_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+const SCHEDULE_DATE_FORMATTER = new Intl.DateTimeFormat('ko-KR', {
   timeZone: 'Asia/Seoul',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
+  month: 'long',
+  day: 'numeric',
+  weekday: 'short',
 });
-
-function toKstDateKey(dateValue) {
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return '';
-  return KST_DATE_KEY_FORMATTER.format(date);
-}
 
 function clearCookie(cookieName) {
   document.cookie = `${cookieName}=; Max-Age=0; Path=/`;
@@ -40,8 +34,6 @@ export default function Home() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { showToast } = useToast();
   const [todaySongs, setTodaySongs] = useState([]);
-  const [wakeupDisplayLabel, setWakeupDisplayLabel] = useState('오늘');
-  const [wakeupDisplayDate, setWakeupDisplayDate] = useState('');
   const [isTomorrowDisplay, setIsTomorrowDisplay] = useState(false);
   const [schedule, setSchedule] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -66,8 +58,6 @@ export default function Home() {
     ])
       .then(([todayRes, scheduleRes]) => {
         setTodaySongs(todayRes.data.songs);
-        setWakeupDisplayLabel(todayRes.data.display_label || '오늘');
-        setWakeupDisplayDate(todayRes.data.display_date || '');
         setIsTomorrowDisplay(Boolean(todayRes.data.is_tomorrow));
         setSchedule(scheduleRes.data.songs);
       })
@@ -139,26 +129,15 @@ export default function Home() {
     }, DOWNLOAD_TIMEOUT_MS);
   };
 
-  const filteredSchedule = useMemo(() => {
-    if (!isTomorrowDisplay || !wakeupDisplayDate) {
-      return schedule;
-    }
-    return schedule.filter((song) => toKstDateKey(song.play_date) !== wakeupDisplayDate);
-  }, [isTomorrowDisplay, wakeupDisplayDate, schedule]);
-
   const grouped = useMemo(() => {
     const groupedByDate = {};
-    for (const song of filteredSchedule) {
-      const dateKey = new Date(song.play_date).toLocaleDateString('ko-KR', {
-        month: 'long',
-        day: 'numeric',
-        weekday: 'short',
-      });
+    for (const song of schedule) {
+      const dateKey = SCHEDULE_DATE_FORMATTER.format(new Date(song.play_date));
       if (!groupedByDate[dateKey]) groupedByDate[dateKey] = [];
       groupedByDate[dateKey].push(song);
     }
     return groupedByDate;
-  }, [filteredSchedule]);
+  }, [schedule]);
 
   if (loading) {
     return <div className="flex justify-center py-20 cu-empty">로딩 중...</div>;
@@ -167,9 +146,9 @@ export default function Home() {
   return (
     <div className="cu-page space-y-6 sm:space-y-7">
       <section className="cu-card">
-        <h2 className="text-base sm:text-lg font-semibold tracking-tight mb-3">{wakeupDisplayLabel}의 기상송</h2>
+        <h2 className="text-base sm:text-lg font-semibold tracking-tight mb-3">{isTomorrowDisplay ? '내일' : '오늘'}의 기상송</h2>
         {todaySongs.length === 0 ? (
-          <p className="cu-empty">{wakeupDisplayLabel} 예정된 기상송이 없습니다.</p>
+          <p className="cu-empty">{isTomorrowDisplay ? '내일' : '오늘'} 예정된 기상송이 없습니다.</p>
         ) : (
           <div className="space-y-3">
             {todaySongs.map(song => (

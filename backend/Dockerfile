@@ -15,13 +15,11 @@ RUN apt-get update \
 # Copy package files
 COPY package*.json ./
 
-# Install all dependencies (including devDependencies for prisma CLI)
+# Install dependencies (devDependencies needed for prisma generate)
 RUN npm ci
 
-# Copy prisma schema
-COPY prisma ./prisma
-
-# Generate Prisma Client
+# Copy prisma schema and generate client
+COPY prisma/schema.prisma ./prisma/schema.prisma
 RUN npx prisma generate
 
 # Copy source code
@@ -30,5 +28,5 @@ COPY src ./src
 # Expose port
 EXPOSE 4000
 
-# For Turso, schema/data migration should be executed externally with Turso CLI.
-CMD ["sh", "-c", "if [ \"$PRISMA_BOOTSTRAP_ON_START\" = \"true\" ]; then npx prisma migrate deploy && npx prisma db seed; fi; node src/index.js"]
+# Migrations are managed externally via Turso CLI.
+CMD ["node", "src/index.js"]

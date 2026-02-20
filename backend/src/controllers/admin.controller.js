@@ -133,12 +133,7 @@ async function approveAllRadio(req, res) {
     data: { status: 'APPROVED', play_date: now, rejected_at: null },
   });
 
-  res.json({
-    updatedCount: result.count,
-    message: result.count > 0
-      ? `${result.count}개의 신청이 승인되었습니다.`
-      : '승인할 신청이 없습니다.',
-  });
+  res.json({ updatedCount: result.count });
 }
 
 async function approveRadio(req, res) {
@@ -307,6 +302,7 @@ async function toggleBlacklist(req, res) {
   const updated = await prisma.user.update({
     where: { id },
     data: { is_blacklisted: !user.is_blacklisted },
+    select: { id: true, email: true, name: true, role: true, is_blacklisted: true },
   });
   res.json({ user: updated });
 }
@@ -321,6 +317,7 @@ async function updateUserRole(req, res) {
   const updated = await prisma.user.update({
     where: { id },
     data: { role },
+    select: { id: true, email: true, name: true, role: true, is_blacklisted: true },
   });
   res.json({ user: updated });
 }

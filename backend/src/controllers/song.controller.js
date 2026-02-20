@@ -251,13 +251,14 @@ async function applyRadio(req, res) {
 
 async function getSchedule(req, res) {
   const displayKstDate = getWakeupDisplayDateKst();
-  const { start: dayStart } = getKstDayRange(displayKstDate);
+  const nextKstDate = addDaysToKstDate(displayKstDate, 1);
+  const { start: nextDayStart } = getKstDayRange(nextKstDate);
 
   const songs = await prisma.song.findMany({
     where: {
       type: 'WAKEUP',
       status: { in: ['APPROVED', 'PLAYED'] },
-      play_date: { gte: dayStart },
+      play_date: { gte: nextDayStart },
     },
     include: { user: { select: { name: true } } },
     orderBy: { play_date: 'asc' },
@@ -267,13 +268,9 @@ async function getSchedule(req, res) {
 }
 
 async function getTodayWakeup(req, res) {
-  const todayKstDate = getKstDate();
   const displayKstDate = getWakeupDisplayDateKst();
   const { start: dayStart, end: dayEnd } = getKstDayRange(displayKstDate);
-  const isTomorrowDisplay =
-    todayKstDate.year !== displayKstDate.year ||
-    todayKstDate.month !== displayKstDate.month ||
-    todayKstDate.day !== displayKstDate.day;
+  const isTomorrow = formatKstDate(displayKstDate) !== formatKstDate(getKstDate());
 
   const songs = await prisma.song.findMany({
     where: {
@@ -288,9 +285,7 @@ async function getTodayWakeup(req, res) {
   res.json({
     songs: sanitizeSongs(songs),
     display_date: formatKstDate(displayKstDate),
-    display_label: isTomorrowDisplay ? '내일' : '오늘',
-    is_tomorrow: isTomorrowDisplay,
-    display_time_zone: 'Asia/Seoul',
+    is_tomorrow: isTomorrow,
   });
 }
 
@@ -426,7 +421,6 @@ async function searchYoutube(req, res) {
       title: item.snippet.title,
       channel_name: item.snippet.channelTitle,
       thumbnail: item.snippet.thumbnails.medium.url,
-      youtube_url: `https://www.youtube.com/watch?v=${item.id.videoId}`,
     }));
 
     res.json({ results });

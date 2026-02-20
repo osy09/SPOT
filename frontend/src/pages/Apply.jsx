@@ -125,7 +125,7 @@ export default function Apply() {
   const handleSelectSong = (song) => {
     clearSearchTimer();
     searchRequestSeqRef.current += 1;
-    setInput(song.youtube_url);
+    setInput(`https://www.youtube.com/watch?v=${song.video_id}`);
     if (error) setError('');
     setSearchResults([]);
     setSearching(false);

@@ -102,13 +102,15 @@ function startScheduler() {
         where: { type: 'WAKEUP', status: 'PENDING' },
         orderBy: { created_at: 'asc' },
         take: remainingSlots,
+        select: { id: true },
       });
 
-      for (const song of pendingSongs) {
-        await prisma.song.update({
-          where: { id: song.id },
+      if (pendingSongs.length > 0) {
+        await prisma.song.updateMany({
+          where: { id: { in: pendingSongs.map((s) => s.id) } },
           data: { status: 'APPROVED', play_date: playDate },
         });
+        console.log(`[스케줄러] ${targetKstDate.year}-${String(targetKstDate.month).padStart(2,'0')}-${String(targetKstDate.day).padStart(2,'0')} 기상송 ${pendingSongs.length}곡 자동 승인됨`);
       }
     } catch (err) {
       console.error('[스케줄러] 오류:', err);

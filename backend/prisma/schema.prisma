@@ -27,8 +27,6 @@ model Song {
   video_id     String
   title        String
   channel_name String
-  story        String?
-  is_anonymous Boolean   @default(false)
   status       String    @default("PENDING") // PENDING, APPROVED, REJECTED, PLAYED
   play_date    DateTime?
   rejected_at  DateTime?
