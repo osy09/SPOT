@@ -33,20 +33,22 @@ async function youtubeCallback(req, res) {
   try {
     const { code, state } = req.query;
 
+    const nonce = res.locals.cspNonce || '';
+
     if (!code) {
-      return res.status(400).send('<script>alert("인증 코드가 없습니다."); window.close();</script>');
+      return res.status(400).send(`<script nonce="${nonce}">alert("인증 코드가 없습니다."); window.close();</script>`);
     }
 
     // Verify state to prevent CSRF attacks
     if (!state || !req.session.youtubeOAuthState || state !== req.session.youtubeOAuthState) {
       console.error('[YouTube Callback] Invalid state parameter');
-      return res.status(403).send('<script>alert("잘못된 요청입니다."); window.close();</script>');
+      return res.status(403).send(`<script nonce="${nonce}">alert("잘못된 요청입니다."); window.close();</script>`);
     }
 
     // Verify user is authenticated and is LEADER
     if (!req.session.youtubeOAuthInitiatedBy) {
       console.error('[YouTube Callback] No initiating user in session');
-      return res.status(403).send('<script>alert("세션이 만료되었습니다."); window.close();</script>');
+      return res.status(403).send(`<script nonce="${nonce}">alert("세션이 만료되었습니다."); window.close();</script>`);
     }
 
     // Verify the initiating user is still LEADER
@@ -56,7 +58,7 @@ async function youtubeCallback(req, res) {
 
     if (!user || user.role !== 'LEADER') {
       console.error('[YouTube Callback] User is not LEADER');
-      return res.status(403).send('<script>alert("권한이 없습니다."); window.close();</script>');
+      return res.status(403).send(`<script nonce="${nonce}">alert("권한이 없습니다."); window.close();</script>`);
     }
 
     const oauth2Client = getOAuth2Client();
@@ -76,10 +78,11 @@ async function youtubeCallback(req, res) {
     delete req.session.youtubeOAuthState;
     delete req.session.youtubeOAuthInitiatedBy;
 
-    res.send('<script>window.close();</script>');
+    res.send(`<script nonce="${nonce}">window.close();</script>`);
   } catch (error) {
     console.error('[YouTube Callback Error]', error.message);
-    res.status(500).send('<script>alert("YouTube 연결에 실패했습니다."); window.close();</script>');
+    const nonce = res.locals.cspNonce || '';
+    res.status(500).send(`<script nonce="${nonce}">alert("YouTube 연결에 실패했습니다."); window.close();</script>`);
   }
 }
 

@@ -1,5 +1,9 @@
 const prisma = require('../lib/prisma');
 const { spawn } = require('child_process');
+
+// 동시 다운로드 제한 (yt-dlp+ffmpeg 프로세스 2개씩 생성하므로 서버 자원 보호)
+const MAX_CONCURRENT_DOWNLOADS = 3;
+let activeDownloads = 0;
 const {
   getKstDate,
   getKstDayRange,
@@ -285,6 +289,7 @@ async function searchUsers(req, res) {
       ],
     },
     select: { id: true, email: true, name: true, role: true, is_blacklisted: true },
+    take: 20,
   });
   res.json({ users });
 }
@@ -348,8 +353,15 @@ async function updateApplyNoticeSettings(req, res) {
 }
 
 async function downloadTodayWakeup(req, res) {
+  if (activeDownloads >= MAX_CONCURRENT_DOWNLOADS) {
+    return res.status(429).json({ error: '현재 다운로드가 많습니다. 잠시 후 다시 시도해주세요.' });
+  }
+
+  activeDownloads++;
   let ytDlpProcess = null;
   let ffmpegProcess = null;
+
+  const releaseDownloadSlot = () => { activeDownloads = Math.max(0, activeDownloads - 1); };
 
   try {
     const displayKstDate = getWakeupDisplayDateKst();
@@ -512,6 +524,7 @@ async function downloadTodayWakeup(req, res) {
 
     // Cleanup on client disconnect
     res.on('close', () => {
+      releaseDownloadSlot();
       if (ytDlpProcess && !ytDlpProcess.killed) ytDlpProcess.kill('SIGKILL');
       if (ffmpegProcess && !ffmpegProcess.killed) ffmpegProcess.kill('SIGKILL');
     });
@@ -525,6 +538,7 @@ async function downloadTodayWakeup(req, res) {
     });
 
   } catch (error) {
+    releaseDownloadSlot();
     console.error('[Download] Error:', error.message);
     console.error('[Download] Stack:', error.stack);
 

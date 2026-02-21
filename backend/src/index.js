@@ -86,9 +86,19 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// 다운로드 전용 Rate Limiting - yt-dlp+ffmpeg 프로세스 생성 비용 고려
+const downloadLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1분
+  max: 5, // IP당 1분에 5회
+  message: { error: '다운로드 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Rate Limiting 적용
 app.use('/auth', authLimiter);
 app.use('/api', apiLimiter);
+app.use('/api/admin/wakeup/download', downloadLimiter);
 
 // 화이트리스트 기반 CORS 설정 - 보안 강화됨
 const allowedOrigins = [
@@ -101,17 +111,15 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // origin이 없는 요청(모바일 앱, Postman 등)은 개발 환경에서만 허용
-    if (!origin && !isProduction) {
+    if (!origin) {
+      // 프로덕션에서는 origin 없는 요청(Postman 등) 차단
+      return callback(null, !isProduction);
+    }
+    if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.warn(`[CORS] 차단된 origin: ${origin}`);
-      callback(new Error('CORS에 의해 허용되지 않음'));
-    }
+    console.warn(`[CORS] 차단된 origin: ${origin}`);
+    callback(new Error('CORS에 의해 허용되지 않음'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

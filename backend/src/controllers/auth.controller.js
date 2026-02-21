@@ -9,7 +9,13 @@ function getMe(req, res) {
 function logout(req, res, next) {
   req.logout((err) => {
     if (err) return next(err);
-    res.json({ message: '로그아웃 되었습니다.' });
+    req.session.destroy((destroyErr) => {
+      if (destroyErr) {
+        console.error('[로그아웃] 세션 삭제 오류:', destroyErr);
+      }
+      res.clearCookie('spot.sid', { path: '/' });
+      res.json({ message: '로그아웃 되었습니다.' });
+    });
   });
 }
 

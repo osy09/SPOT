@@ -99,7 +99,7 @@ async function applyWakeup(req, res) {
 
   const parsedRequest = parseYoutubeRequest(req, res);
   if (!parsedRequest) return;
-  const { youtube_url, video_id } = parsedRequest;
+  const { video_id } = parsedRequest;
 
   const info = await fetchVideoInfo(video_id);
   if (!info) {
@@ -159,7 +159,7 @@ async function applyWakeup(req, res) {
         data: {
           user_id: req.user.id,
           type: 'WAKEUP',
-          youtube_url,
+          youtube_url: `https://www.youtube.com/watch?v=${video_id}`,
           video_id,
           title: info.title,
           channel_name: info.channel_name,
@@ -196,7 +196,7 @@ async function applyRadio(req, res) {
 
   const parsedRequest = parseYoutubeRequest(req, res);
   if (!parsedRequest) return;
-  const { youtube_url, video_id } = parsedRequest;
+  const { video_id } = parsedRequest;
 
   const info = await fetchVideoInfo(video_id);
   if (!info) {
@@ -229,7 +229,7 @@ async function applyRadio(req, res) {
         data: {
           user_id: req.user.id,
           type: 'RADIO',
-          youtube_url,
+          youtube_url: `https://www.youtube.com/watch?v=${video_id}`,
           video_id,
           title: info.title,
           channel_name: info.channel_name,

@@ -8,6 +8,8 @@ const {
   kstDateToUtcDate,
 } = require('./kst-time');
 
+// 세션 정리는 PrismaSessionStore의 1시간 interval에서 처리
+
 /**
  * 만료된 곡 정리
  * - 오늘 이전 날짜의 APPROVED 상태 기상송 삭제
@@ -41,26 +43,6 @@ async function cleanupExpiredSongs(now = new Date()) {
       `[스케줄러] 만료 곡 정리 (기준일: ${todayStartUtc.toISOString()}) — ` +
       `APPROVED ${deletedApproved.count}개, REJECTED ${deletedRejected.count}개 삭제됨`
     );
-  }
-}
-
-/**
- * 데이터베이스에서 만료된 세션 정리
- * expires_at < now 인 세션 삭제
- */
-async function cleanupExpiredSessions() {
-  try {
-    const result = await prisma.session.deleteMany({
-      where: {
-        expires_at: { lt: new Date() },
-      },
-    });
-
-    if (result.count > 0) {
-      console.log(`[세션 정리] ${result.count}개의 만료된 세션 삭제됨`);
-    }
-  } catch (error) {
-    console.error('[세션 정리 오류]', error.message);
   }
 }
 
@@ -126,31 +108,9 @@ function startScheduler() {
     }
   }, { timezone: KST_TIMEZONE });
 
-  // 매일 03:00 KST에 실행 - 만료된 세션 정리
-  cron.schedule('0 3 * * *', async () => {
-    try {
-      await cleanupExpiredSessions();
-    } catch (err) {
-      console.error('[스케줄러] 세션 정리 오류:', err);
-    }
-  }, { timezone: KST_TIMEZONE });
-
-  // 6시간마다 실행 - 추가 세션 정리 (안전장치)
-  cron.schedule('0 */6 * * *', async () => {
-    try {
-      await cleanupExpiredSessions();
-    } catch (err) {
-      console.error('[스케줄러] 세션 정리 오류:', err);
-    }
-  }, { timezone: KST_TIMEZONE });
-
   // 시작 시 한 번 실행하여 즉시 일관성 확보
   cleanupExpiredSongs().catch((err) => {
     console.error('[스케줄러] 시작 시 곡 정리 오류:', err);
-  });
-
-  cleanupExpiredSessions().catch((err) => {
-    console.error('[스케줄러] 시작 시 세션 정리 오류:', err);
   });
 
   console.log('[스케줄러] 크론 작업이 성공적으로 시작되었습니다');

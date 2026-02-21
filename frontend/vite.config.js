@@ -52,16 +52,22 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//, /^\/auth\//],
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.origin === self.location.origin && url.pathname.startsWith('/api/'),
+            // 공개 읽기 전용 엔드포인트만 캐시 (인증/관리자 API 제외)
+            urlPattern: ({ url }) =>
+              url.origin === self.location.origin && (
+                url.pathname === '/api/songs/today' ||
+                url.pathname === '/api/songs/schedule' ||
+                url.pathname === '/api/songs/daily'
+              ),
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'api-cache',
+              cacheName: 'api-public-cache',
               expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 300
+                maxEntries: 5,
+                maxAgeSeconds: 60
               },
               cacheableResponse: {
-                statuses: [0, 200]
+                statuses: [200]
               }
             }
           }

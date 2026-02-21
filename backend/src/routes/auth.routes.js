@@ -2,12 +2,11 @@ const router = require('express').Router();
 const passport = require('passport');
 const { getMe, logout } = require('../controllers/auth.controller');
 
-// Note: Passport.js Google OAuth20 Strategy handles state verification internally
-// Additional custom state verification can cause session issues during OAuth flow
 router.get(
   '/google',
   passport.authenticate('google', {
     scope: ['profile', 'email'],
+    state: true,
   })
 );
 
