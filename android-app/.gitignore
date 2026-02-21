@@ -1,0 +1,16 @@
+# 로컬 SDK 경로 (머신마다 다름)
+local.properties
+
+# Gradle 캐시
+.gradle/
+
+# Android Studio 모듈/워크스페이스 설정 (자동 생성)
+*.iml
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+
+# 키스토어 (보안)
+*.jks
+*.keystore

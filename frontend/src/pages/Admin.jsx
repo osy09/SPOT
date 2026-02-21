@@ -48,6 +48,7 @@ function getWakeupScheduleMinDateInputValue(date = new Date()) {
 
 function WakeupQueue() {
   const [songs, setSongs] = useState([]);
+  const [todaySongs, setTodaySongs] = useState([]);
   const [approvedSongs, setApprovedSongs] = useState([]);
   const [deleting, setDeleting] = useState(null);
   const [scheduling, setScheduling] = useState(null);
@@ -60,13 +61,17 @@ function WakeupQueue() {
     () => api.get('/api/admin/wakeup/queue').then(r => setSongs(r.data.songs)),
     []
   );
+  const loadToday = useCallback(
+    () => api.get('/api/songs/today').then(r => setTodaySongs(r.data.songs)),
+    []
+  );
   const loadApproved = useCallback(
     () => api.get('/api/songs/schedule').then(r => setApprovedSongs(r.data.songs)),
     []
   );
   const refresh = useCallback(
-    () => Promise.all([load(), loadApproved()]),
-    [load, loadApproved]
+    () => Promise.all([load(), loadToday(), loadApproved()]),
+    [load, loadToday, loadApproved]
   );
 
   useEffect(() => {
@@ -175,11 +180,11 @@ function WakeupQueue() {
         </p>
       </div>
 
-      {approvedSongs.length > 0 && (
+      {(todaySongs.length > 0 || approvedSongs.length > 0) && (
         <div>
           <h3 className="text-lg font-semibold mb-3">승인된 기상송 스케줄</h3>
           <div className="space-y-3">
-            {approvedSongs.map((song) => (
+            {[...todaySongs, ...approvedSongs].map((song) => (
               <SongCard
                 key={song.id}
                 song={song}
