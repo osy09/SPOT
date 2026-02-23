@@ -49,6 +49,10 @@ class RefreshWorker @AssistedInject constructor(
             val songs = repository.refreshSongs()
             val playTimes = settingsDataStore.playTimesFlow.first()
             alarmScheduler.scheduleAll(playTimes, songs)
+            val now = java.util.Calendar.getInstance()
+            val h = now.get(java.util.Calendar.HOUR_OF_DAY).toString().padStart(2, '0')
+            val m = now.get(java.util.Calendar.MINUTE).toString().padStart(2, '0')
+            settingsDataStore.saveLastRefreshedTime("$h:$m")
             Log.d(TAG, "Refresh done: ${songs.size} songs, alarms rescheduled.")
             Result.success()
         } catch (e: Exception) {

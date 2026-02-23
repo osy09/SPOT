@@ -34,10 +34,11 @@ class MainViewModel @Inject constructor(
             combine(
                 repository.songs,
                 settingsDataStore.playTimesFlow,
-            ) { songs, times -> songs to times }
-                .collect { (songs, times) ->
+                settingsDataStore.lastRefreshedTimeFlow,
+            ) { songs, times, lastRefreshed -> Triple(songs, times, lastRefreshed) }
+                .collect { (songs, times, lastRefreshed) ->
                     _uiState.update {
-                        it.copy(songs = songs, playTimes = times, isLoading = false)
+                        it.copy(songs = songs, playTimes = times, isLoading = false, lastRefreshedTime = lastRefreshed)
                     }
                 }
         }
@@ -55,7 +56,8 @@ class MainViewModel @Inject constructor(
                 val now = java.util.Calendar.getInstance()
                 val h = now.get(java.util.Calendar.HOUR_OF_DAY).toString().padStart(2, '0')
                 val m = now.get(java.util.Calendar.MINUTE).toString().padStart(2, '0')
-                _uiState.update { it.copy(isLoading = false, lastRefreshedTime = "$h:$m") }
+                settingsDataStore.saveLastRefreshedTime("$h:$m")
+                _uiState.update { it.copy(isLoading = false) }
             } catch (e: Exception) {
                 // 갱신 실패 시 캐시된 기상송으로 알람 재등록
                 try {
