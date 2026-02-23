@@ -18,7 +18,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     fetchUser();
 
-    // Poll while visible, and refresh immediately when tab/window regains focus.
+    // 탭이 보이는 동안 폴링하며, 탭·창이 포커스를 되찾을 때 즉시 갱신.
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
         fetchUser();

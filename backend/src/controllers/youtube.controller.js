@@ -11,9 +11,9 @@ function getOAuth2Client() {
   );
 }
 
-// Step 1: Leader initiates YouTube auth for the shared department account
+// Step 1: 방송부장이 방송부 공용 계정의 YouTube 인증을 시작
 async function startYoutubeAuth(req, res) {
-  // Generate secure state token for CSRF protection
+  // CSRF 방어를 위한 보안 state 토큰 생성
   const state = crypto.randomBytes(32).toString('hex');
   req.session.youtubeOAuthState = state;
   req.session.youtubeOAuthInitiatedBy = req.user.id;
@@ -28,7 +28,7 @@ async function startYoutubeAuth(req, res) {
   res.json({ url });
 }
 
-// Step 2: OAuth callback - store refresh token
+// Step 2: OAuth 콜백 - refresh token 저장
 async function youtubeCallback(req, res) {
   try {
     const { code, state } = req.query;
@@ -39,19 +39,19 @@ async function youtubeCallback(req, res) {
       return res.status(400).send(`<script nonce="${nonce}">alert("인증 코드가 없습니다."); window.close();</script>`);
     }
 
-    // Verify state to prevent CSRF attacks
+    // CSRF 공격 방지를 위한 state 검증
     if (!state || !req.session.youtubeOAuthState || state !== req.session.youtubeOAuthState) {
       console.error('[YouTube Callback] Invalid state parameter');
       return res.status(403).send(`<script nonce="${nonce}">alert("잘못된 요청입니다."); window.close();</script>`);
     }
 
-    // Verify user is authenticated and is LEADER
+    // 사용자 인증 여부 및 LEADER 역할 확인
     if (!req.session.youtubeOAuthInitiatedBy) {
       console.error('[YouTube Callback] No initiating user in session');
       return res.status(403).send(`<script nonce="${nonce}">alert("세션이 만료되었습니다."); window.close();</script>`);
     }
 
-    // Verify the initiating user is still LEADER
+    // 인증을 시작한 사용자가 여전히 LEADER인지 확인
     const user = await prisma.user.findUnique({
       where: { id: req.session.youtubeOAuthInitiatedBy },
     });
@@ -65,7 +65,7 @@ async function youtubeCallback(req, res) {
     const { tokens } = await oauth2Client.getToken(code);
 
     if (tokens.refresh_token) {
-      // Encrypt refresh token before storing
+      // 저장 전 refresh token 암호화
       const encryptedToken = encrypt(tokens.refresh_token);
       await prisma.systemToken.upsert({
         where: { key: 'youtube_refresh_token' },
@@ -74,7 +74,7 @@ async function youtubeCallback(req, res) {
       });
     }
 
-    // Clear OAuth state from session
+    // 세션에서 OAuth state 제거
     delete req.session.youtubeOAuthState;
     delete req.session.youtubeOAuthInitiatedBy;
 
@@ -86,7 +86,7 @@ async function youtubeCallback(req, res) {
   }
 }
 
-// Check if YouTube is connected
+// YouTube 연결 여부 확인
 async function getYoutubeStatus(req, res) {
   try {
     const token = await prisma.systemToken.findUnique({
@@ -99,7 +99,7 @@ async function getYoutubeStatus(req, res) {
   }
 }
 
-// Export approved radio songs as a YouTube playlist
+// 승인된 점심방송 신청곡을 YouTube 재생목록으로 내보내기
 async function exportPlaylist(req, res) {
   try {
     const { songIds, title } = req.body;
@@ -114,14 +114,14 @@ async function exportPlaylist(req, res) {
       return res.status(400).json({ error: 'YouTube 계정이 연결되지 않았습니다.' });
     }
 
-    // Decrypt refresh token before use
+    // 사용 전 refresh token 복호화
     const refreshToken = decrypt(tokenRecord.value);
     const oauth2Client = getOAuth2Client();
     oauth2Client.setCredentials({ refresh_token: refreshToken });
 
     const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
 
-    // Create playlist
+    // 재생목록 생성
     const playlistTitle = title || `SPOT 점심방송 - ${new Date().toLocaleDateString('ko-KR')}`;
     const playlistRes = await youtube.playlists.insert({
       part: 'snippet,status',
@@ -132,7 +132,7 @@ async function exportPlaylist(req, res) {
     });
     const playlistId = playlistRes.data.id;
 
-    // Add songs to playlist
+    // 재생목록에 곡 추가
     const songs = await prisma.song.findMany({
       where: { id: { in: songIds.map(Number) } },
       orderBy: { created_at: 'asc' },

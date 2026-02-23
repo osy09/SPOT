@@ -2,25 +2,25 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
+# 패키지 파일 복사
 COPY package*.json ./
 
-# Install dependencies
+# 의존성 설치
 RUN npm ci
 
-# Copy source code
+# 소스 코드 복사
 COPY . .
 
-# Build the app
+# 앱 빌드
 RUN npm run build
 
-# Production stage
+# 프로덕션 스테이지
 FROM nginx:alpine
 
-# Copy built files to nginx
+# 빌드 결과물을 nginx에 복사
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy nginx configuration
+# nginx 설정 복사
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80

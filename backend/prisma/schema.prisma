@@ -11,7 +11,7 @@ model User {
   id             Int     @id @default(autoincrement())
   email          String  @unique
   name           String
-  role           String  @default("USER") // USER, MEMBER, LEADER
+  role           String  @default("USER") // USER(일반), MEMBER(방송부원), LEADER(방송부장)
   is_blacklisted Boolean @default(false)
   last_login_at  DateTime @default(now())
   created_at     String  @default(dbgenerated("(datetime('now', 'localtime'))"))
@@ -22,12 +22,12 @@ model User {
 model Song {
   id           Int       @id @default(autoincrement())
   user_id      Int
-  type         String    // WAKEUP, RADIO
+  type         String    // WAKEUP(기상송), RADIO(점심방송)
   youtube_url  String
   video_id     String
   title        String
   channel_name String
-  status       String    @default("PENDING") // PENDING, APPROVED, REJECTED, PLAYED
+  status       String    @default("PENDING") // PENDING(대기), APPROVED(승인), REJECTED(거절), PLAYED(재생됨)
   play_date    DateTime?
   rejected_at  DateTime?
   created_at   DateTime  @default(now())

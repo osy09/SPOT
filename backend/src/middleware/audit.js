@@ -60,7 +60,7 @@ function shouldAuditLog({ userSnapshot, method, path }) {
   if (!userSnapshot || !userSnapshot.id) return false;
   if (!AUDIT_ALLOWED_ROLES.has(userSnapshot.role)) return false;
   if (!AUDIT_ALLOWED_METHODS.has(method)) return false;
-  // Audit only management mutations from admin APIs.
+  // 관리자 API의 관리 변경 요청만 감사 로그 기록.
   return path.startsWith('/api/admin/');
 }
 

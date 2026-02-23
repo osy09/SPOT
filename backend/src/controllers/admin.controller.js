@@ -60,7 +60,7 @@ async function updateWakeupSchedule(req, res) {
     return res.status(400).json({ error: '올바른 날짜 형식이 아닙니다.' });
   }
 
-  // Check if the date is in the past based on 08:00 KST display 기준
+  // 08:00 KST 표시 기준으로 과거 날짜인지 확인
   const minAllowedKstDate = getWakeupDisplayDateKst();
   const minAllowedStartUtc = kstDateToUtcDate(minAllowedKstDate, 0, 0, 0, 0);
   const requestedStartUtc = kstDateToUtcDate(parsedKstDate, 0, 0, 0, 0);
@@ -276,7 +276,7 @@ async function getAuditLogs(req, res) {
   });
 }
 
-// Blacklist management
+// 블랙리스트 관리
 async function searchUsers(req, res) {
   const queryText = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   if (!queryText) return res.json({ users: [] });
@@ -299,7 +299,7 @@ async function toggleBlacklist(req, res) {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
 
-  // Prevent blocking LEADER and MEMBER
+  // 방송부원·방송부장 차단 방지
   if (user.role === 'LEADER' || user.role === 'MEMBER') {
     return res.status(403).json({ error: '방송부원과 방송부장은 차단할 수 없습니다.' });
   }
@@ -384,8 +384,8 @@ async function downloadTodayWakeup(req, res) {
     const { videoId } = req.params;
     const { downloadToken } = req.query;
 
-    // Additional security: verify videoId format (defense in depth)
-    // This is already validated by middleware, but double-check for safety
+    // 추가 보안: videoId 형식 검증 (심층 방어)
+    // 미들웨어에서 이미 검증했지만 안전을 위해 재확인
     if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
       return res.status(400).json({ error: '유효하지 않은 비디오 ID입니다.' });
     }
@@ -396,12 +396,12 @@ async function downloadTodayWakeup(req, res) {
       return res.status(404).json({ error: '해당 곡을 찾을 수 없습니다.' });
     }
 
-    // Construct URL safely - videoId is now guaranteed to be safe
+    // 안전하게 URL 구성 - videoId는 이제 안전성이 보장됨
     const url = `https://www.youtube.com/watch?v=${videoId}`;
 
     const sanitizedTitle = song.title.replace(/[<>:"/\\|?*]/g, '_');
 
-    // Set response headers
+    // 응답 헤더 설정
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(sanitizedTitle)}.mp3"`);
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Cache-Control', 'no-store');
@@ -428,7 +428,7 @@ async function downloadTodayWakeup(req, res) {
       res.append('Set-Cookie', cookieParts.join('; '));
     };
 
-    // Use yt-dlp as extractor to avoid frequent YouTube decipher/signature breakages
+    // yt-dlp를 추출기로 사용해 YouTube 복호화/서명 오류를 방지
     ytDlpProcess = spawn('yt-dlp', [
       '--no-playlist',
       '--no-warnings',
@@ -442,7 +442,7 @@ async function downloadTodayWakeup(req, res) {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
-    // Create ffmpeg process
+    // ffmpeg 프로세스 생성
     ffmpegProcess = spawn('ffmpeg', [
       '-loglevel', 'error',
       '-i', 'pipe:0',
@@ -500,7 +500,7 @@ async function downloadTodayWakeup(req, res) {
     });
 
     ffmpegProcess.stdin.on('error', (error) => {
-      // EPIPE can happen if ffmpeg exits before yt-dlp stream fully ends
+      // yt-dlp 스트림이 끝나기 전에 ffmpeg가 종료되면 EPIPE 발생 가능
       if (error.code !== 'EPIPE') {
         console.error('[Download] FFmpeg stdin error:', error.message);
       }
@@ -522,14 +522,14 @@ async function downloadTodayWakeup(req, res) {
       }
     });
 
-    // Cleanup on client disconnect
+    // 클라이언트 연결 해제 시 정리
     res.on('close', () => {
       releaseDownloadSlot();
       if (ytDlpProcess && !ytDlpProcess.killed) ytDlpProcess.kill('SIGKILL');
       if (ffmpegProcess && !ffmpegProcess.killed) ffmpegProcess.kill('SIGKILL');
     });
 
-    // Pipe streams. Mark download start only when first MP3 bytes are ready.
+    // 스트림 연결. 첫 MP3 바이트가 준비된 시점에만 다운로드 시작을 기록.
     ytDlpProcess.stdout.pipe(ffmpegProcess.stdin);
     ffmpegProcess.stdout.once('data', (chunk) => {
       markDownloadStarted();
@@ -542,7 +542,7 @@ async function downloadTodayWakeup(req, res) {
     console.error('[Download] Error:', error.message);
     console.error('[Download] Stack:', error.stack);
 
-    // Cleanup
+    // 리소스 정리
     if (ytDlpProcess && !ytDlpProcess.killed) ytDlpProcess.kill('SIGKILL');
     if (ffmpegProcess && !ffmpegProcess.killed) ffmpegProcess.kill('SIGKILL');
 
