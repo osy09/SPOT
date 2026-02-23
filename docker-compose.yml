@@ -26,6 +26,23 @@ services:
     networks:
       - spot-network
 
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: spot-scheduler
+    restart: unless-stopped
+    profiles: ["scheduler"]
+    command: ["node", "src/scheduler-entry.js"]
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${TURSO_DATABASE_URL}
+      - TURSO_DATABASE_URL=${TURSO_DATABASE_URL}
+      - TURSO_AUTH_TOKEN=${TURSO_AUTH_TOKEN}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    networks:
+      - spot-network
+
   frontend:
     build:
       context: ./frontend

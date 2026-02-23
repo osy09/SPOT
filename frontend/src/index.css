@@ -26,6 +26,8 @@
   --cu-btn-red: #ff4242;
   --cu-neutral-btn: #5f6f82;
   --cu-focus-ring: #bcd3f3;
+  --cu-tabbar-bg: #E6E6E7;
+  --cu-tabbar-active: #FFFFFF;
 }
 
 .dark {
@@ -53,6 +55,8 @@
   --cu-btn-red: #ff4242;
   --cu-neutral-btn: #5f6f82;
   --cu-focus-ring: #3f608a;
+  --cu-tabbar-bg: #393A3B;
+  --cu-tabbar-active: #8C8D8F;
 }
 
 * {
@@ -149,15 +153,15 @@ select {
   .cu-tabbar {
     display: flex;
     gap: 0.35rem;
-    border: 1px solid var(--cu-line);
+    border: none;
     border-radius: 0.72rem;
     padding: 0.3rem;
-    background: var(--cu-panel-muted);
+    background: var(--cu-tabbar-bg);
   }
 
   .cu-tab {
     flex: 1;
-    border: 1px solid transparent;
+    border: none;
     border-radius: 0.6rem;
     background: transparent;
     color: var(--cu-muted);
@@ -180,9 +184,9 @@ select {
   }
 
   .cu-tab.is-active {
-    color: var(--cu-accent);
-    border-color: var(--cu-accent-border);
-    background: var(--cu-accent-soft);
+    color: var(--cu-text);
+    border: none;
+    background: var(--cu-tabbar-active);
   }
 
   .cu-btn {

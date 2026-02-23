@@ -10,7 +10,6 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
 const passport = require('./config/passport');
-const { startScheduler } = require('./lib/scheduler');
 const { auditLogger } = require('./middleware/audit');
 const prisma = require('./lib/prisma');
 const { PrismaSessionStore } = require('./lib/prisma-session-store');
@@ -179,9 +178,6 @@ app.use((err, _req, res, _next) => {
     });
   }
 });
-
-// 스케줄러 시작
-startScheduler();
 
 app.listen(PORT, () => {
   console.log(`[서버] 포트 ${PORT}에서 실행 중`);
