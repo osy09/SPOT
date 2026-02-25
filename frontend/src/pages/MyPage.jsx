@@ -51,15 +51,6 @@ export default function MyPage() {
     return songs;
   }, [filter, songs]);
 
-  const stats = useMemo(
-    () => ({
-      total: songs.length,
-      wakeup: songs.filter((s) => s.type === 'WAKEUP').length,
-      radio: songs.filter((s) => s.type === 'RADIO').length,
-      approved: songs.filter((s) => s.status === 'APPROVED' || s.status === 'PLAYED').length,
-    }),
-    [songs]
-  );
 
   const cancelSong = async (songId) => {
     if (!confirm('대기중인 신청을 취소하시겠습니까?')) return;
@@ -130,25 +121,6 @@ export default function MyPage() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <div className="cu-card">
-          <p className="text-xs mb-1" style={{ color: 'var(--cu-muted)' }}>전체 신청</p>
-          <p className="text-2xl font-bold">{stats.total}</p>
-        </div>
-        <div className="cu-card">
-          <p className="text-xs mb-1" style={{ color: 'var(--cu-muted)' }}>기상송</p>
-          <p className="text-2xl font-bold">{stats.wakeup}</p>
-        </div>
-        <div className="cu-card">
-          <p className="text-xs mb-1" style={{ color: 'var(--cu-muted)' }}>점심방송</p>
-          <p className="text-2xl font-bold">{stats.radio}</p>
-        </div>
-        <div className="cu-card">
-          <p className="text-xs mb-1" style={{ color: 'var(--cu-muted)' }}>승인됨</p>
-          <p className="text-2xl font-bold">{stats.approved}</p>
-        </div>
-      </div>
 
       {/* Filter */}
       <div className="cu-tabbar mb-4">
