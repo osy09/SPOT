@@ -80,7 +80,8 @@ function parseYoutubeRequest(req, res) {
 async function fetchVideoInfo(videoId) {
   try {
     const res = await axios.get(
-      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
+      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+      { timeout: 5000 }
     );
     return {
       title: res.data.title,
@@ -394,6 +395,10 @@ async function searchYoutube(req, res) {
 
     if (!queryText) {
       return res.status(400).json({ error: '검색어를 입력해주세요.' });
+    }
+
+    if (queryText.length > 100) {
+      return res.status(400).json({ error: '검색어는 100자 이하여야 합니다.' });
     }
 
     // YouTube Data API Key가 없으면 오류 반환

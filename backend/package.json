@@ -34,5 +34,8 @@
   },
   "prisma": {
     "seed": "node prisma/seed.js"
+  },
+  "overrides": {
+    "minimatch": "^9.0.6"
   }
 }

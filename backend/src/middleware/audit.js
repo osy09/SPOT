@@ -46,14 +46,9 @@ function sanitizePayload(payload) {
 }
 
 function getClientIp(req) {
-  const forwardedFor = req.headers['x-forwarded-for'];
-  if (typeof forwardedFor === 'string' && forwardedFor.length > 0) {
-    return forwardedFor.split(',')[0].trim().slice(0, MAX_IP_LENGTH);
-  }
-  if (req.ip) {
-    return String(req.ip).slice(0, MAX_IP_LENGTH);
-  }
-  return null;
+  // req.ip는 Express trust proxy 설정을 기반으로 안전하게 정규화된 IP를 반환.
+  // X-Forwarded-For를 직접 파싱하면 클라이언트가 헤더를 위조해 감사 로그 IP를 조작할 수 있음.
+  return req.ip ? String(req.ip).slice(0, MAX_IP_LENGTH) : null;
 }
 
 function shouldAuditLog({ userSnapshot, method, path }) {

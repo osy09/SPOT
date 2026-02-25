@@ -138,16 +138,26 @@ async function exportPlaylist(req, res) {
       orderBy: { created_at: 'asc' },
     });
 
-    for (const song of songs) {
-      await youtube.playlistItems.insert({
-        part: 'snippet',
-        requestBody: {
-          snippet: {
-            playlistId,
-            resourceId: { kind: 'youtube#video', videoId: song.video_id },
+    // 각 API 호출에 30초 타임아웃 적용 (최대 100곡 × 순차 호출 시 장시간 블로킹 방지)
+    const insertWithTimeout = (song) => {
+      return Promise.race([
+        youtube.playlistItems.insert({
+          part: 'snippet',
+          requestBody: {
+            snippet: {
+              playlistId,
+              resourceId: { kind: 'youtube#video', videoId: song.video_id },
+            },
           },
-        },
-      });
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('YouTube API 응답 시간 초과')), 30_000)
+        ),
+      ]);
+    };
+
+    for (const song of songs) {
+      await insertWithTimeout(song);
     }
 
     res.json({

@@ -3,6 +3,7 @@ const { spawn } = require('child_process');
 
 // 동시 다운로드 제한 (yt-dlp+ffmpeg 프로세스 2개씩 생성하므로 서버 자원 보호)
 const MAX_CONCURRENT_DOWNLOADS = 3;
+const DOWNLOAD_TIMEOUT_MS = 3 * 60 * 1000; // 3분: 응답 없는 프로세스 강제 종료
 let activeDownloads = 0;
 const {
   getKstDate,
@@ -210,7 +211,7 @@ async function getTodayRadioPlaylist(req, res) {
 
 async function getAuditLogs(req, res) {
   const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
-  const pageSize = Math.min(100, Math.max(1, Number.parseInt(req.query.pageSize, 10) || 30));
+  const pageSize = Math.min(50, Math.max(1, Number.parseInt(req.query.pageSize, 10) || 30));
   const skip = (page - 1) * pageSize;
 
   const where = {
@@ -218,6 +219,9 @@ async function getAuditLogs(req, res) {
   };
 
   const queryText = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  if (queryText.length > 100) {
+    return res.status(400).json({ error: '검색어는 100자 이하여야 합니다.' });
+  }
   if (queryText) {
     where.OR = [
       { user_email: { contains: queryText } },
@@ -360,8 +364,23 @@ async function downloadTodayWakeup(req, res) {
   activeDownloads++;
   let ytDlpProcess = null;
   let ffmpegProcess = null;
+  // 슬롯 중복 반납 방지: idempotent 플래그
+  let slotReleased = false;
+  // 스트리밍 경로 진입 여부: true이면 finally 대신 res.on('close')가 슬롯 반납
+  let slotReleasedByStream = false;
+  let downloadTimeoutId = null;
 
-  const releaseDownloadSlot = () => { activeDownloads = Math.max(0, activeDownloads - 1); };
+  const releaseDownloadSlot = () => {
+    if (!slotReleased) {
+      slotReleased = true;
+      activeDownloads = Math.max(0, activeDownloads - 1);
+    }
+  };
+
+  const killProcesses = () => {
+    if (ytDlpProcess && !ytDlpProcess.killed) ytDlpProcess.kill('SIGKILL');
+    if (ffmpegProcess && !ffmpegProcess.killed) ffmpegProcess.kill('SIGKILL');
+  };
 
   try {
     const displayKstDate = getWakeupDisplayDateKst();
@@ -377,6 +396,7 @@ async function downloadTodayWakeup(req, res) {
       orderBy: { play_date: 'asc' },
     });
 
+    // 아래 조기 return들은 finally에서 슬롯 반납 처리됨
     if (songs.length === 0) {
       return res.status(404).json({ error: `${formatKstDate(displayKstDate)}(KST) 기준 기상송이 없습니다.` });
     }
@@ -461,9 +481,7 @@ async function downloadTodayWakeup(req, res) {
     let ffmpegError = '';
     ytDlpProcess.on('error', (error) => {
       console.error('[Download] yt-dlp start error:', error.message);
-      if (ffmpegProcess && !ffmpegProcess.killed) {
-        ffmpegProcess.kill('SIGKILL');
-      }
+      killProcesses();
       if (!res.headersSent) {
         res.status(500).json({ error: 'yt-dlp를 실행하지 못했습니다.' });
       }
@@ -522,12 +540,28 @@ async function downloadTodayWakeup(req, res) {
       }
     });
 
-    // 클라이언트 연결 해제 시 정리
+    // 클라이언트 연결 해제/완료 시 타임아웃 해제 후 슬롯 반납 (스트리밍 경로의 유일한 반납 지점)
     res.on('close', () => {
+      clearTimeout(downloadTimeoutId);
       releaseDownloadSlot();
-      if (ytDlpProcess && !ytDlpProcess.killed) ytDlpProcess.kill('SIGKILL');
-      if (ffmpegProcess && !ffmpegProcess.killed) ffmpegProcess.kill('SIGKILL');
+      killProcesses();
     });
+
+    // 이 시점부터 슬롯 소유권이 res.on('close')로 이전되므로 finally에서 반납하지 않음
+    slotReleasedByStream = true;
+
+    // 3분 타임아웃: yt-dlp/ffmpeg가 멈추면 강제 종료하여 슬롯 반환
+    downloadTimeoutId = setTimeout(() => {
+      console.error('[Download] 3분 타임아웃 초과: 프로세스 강제 종료');
+      killProcesses();
+      if (!res.writableEnded) {
+        if (!res.headersSent) {
+          res.status(504).json({ error: '다운로드 시간이 초과되었습니다.' });
+        } else {
+          res.end();
+        }
+      }
+    }, DOWNLOAD_TIMEOUT_MS);
 
     // 스트림 연결. 첫 MP3 바이트가 준비된 시점에만 다운로드 시작을 기록.
     ytDlpProcess.stdout.pipe(ffmpegProcess.stdin);
@@ -538,19 +572,20 @@ async function downloadTodayWakeup(req, res) {
     });
 
   } catch (error) {
-    releaseDownloadSlot();
+    killProcesses();
     console.error('[Download] Error:', error.message);
     console.error('[Download] Stack:', error.stack);
-
-    // 리소스 정리
-    if (ytDlpProcess && !ytDlpProcess.killed) ytDlpProcess.kill('SIGKILL');
-    if (ffmpegProcess && !ffmpegProcess.killed) ffmpegProcess.kill('SIGKILL');
 
     if (!res.headersSent) {
       if (error.message.includes('Video unavailable')) {
         return res.status(404).json({ error: '영상을 찾을 수 없습니다.' });
       }
       return res.status(500).json({ error: '다운로드에 실패했습니다: ' + error.message });
+    }
+  } finally {
+    // 스트리밍 경로로 진입하지 못한 모든 경우(조기 return, 예외)에서 슬롯 반납
+    if (!slotReleasedByStream) {
+      releaseDownloadSlot();
     }
   }
 }

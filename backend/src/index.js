@@ -23,7 +23,9 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const isProduction = process.env.NODE_ENV === 'production';
 
-// 프록시 신뢰 설정 - Cloudflare Tunnel 및 보안 쿠키에 필요
+// 프록시 신뢰 설정
+// 구조: Client → Cloudflare → cloudflared(Tunnel) → nginx → backend
+// nginx가 X-Forwarded-For를 단일 실제 IP로 정규화해 전달하므로 1홉만 신뢰
 app.set('trust proxy', 1);
 
 // 필수 환경 변수 검증
@@ -53,6 +55,7 @@ app.use((_req, res, next) => {
         baseUri: ["'self'"],
         formAction: ["'self'"],
         frameAncestors: ["'none'"],
+        reportUri: ['/api/csp-report'],
       },
     },
     hsts: {
@@ -127,6 +130,7 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: '1mb' })); // DoS 방지를 위한 body 크기 제한
+app.use(express.json({ type: 'application/csp-report', limit: '4kb' })); // CSP 위반 보고용
 app.use(session({
   store: new PrismaSessionStore(prisma),
   secret: process.env.SESSION_SECRET,
@@ -135,7 +139,9 @@ app.use(session({
   cookie: {
     secure: isProduction, // 프로덕션에서만 HTTPS 강제
     httpOnly: true, // XSS 공격 방지
-    sameSite: 'lax', // CSRF 보호 (교차 사이트 요청이 필요 없다면 'strict' 사용)
+    // 'strict'로 변경 불가: YouTube OAuth 콜백이 accounts.google.com에서 리다이렉트될 때
+    // 세션 쿠키가 전송되어야 youtubeOAuthState 검증이 동작함
+    sameSite: 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
   },
   name: 'spot.sid', // 커스텀 세션 쿠키 이름
@@ -143,6 +149,24 @@ app.use(session({
 }));
 app.use(passport.initialize());
 app.use(passport.session());
+
+// 절대 세션 만료 (rolling:true로 인해 활성 세션이 무기한 연장되는 것을 방지)
+const SESSION_ABSOLUTE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30일
+app.use((req, res, next) => {
+  if (!req.session) return next();
+  if (!req.session.createdAt) {
+    req.session.createdAt = Date.now();
+    return next();
+  }
+  if (Date.now() - req.session.createdAt > SESSION_ABSOLUTE_TTL_MS) {
+    return req.session.destroy(() => {
+      res.clearCookie('spot.sid');
+      res.status(401).json({ error: '세션이 만료되었습니다. 다시 로그인해주세요.' });
+    });
+  }
+  next();
+});
+
 app.use(auditLogger);
 
 // 라우트 등록
@@ -152,6 +176,15 @@ app.use('/api/admin', adminRoutes);
 
 // YouTube OAuth 콜백 (공개 엔드포인트)
 app.get('/api/youtube/callback', youtubeCallback);
+
+// CSP 위반 보고 수신 엔드포인트
+app.post('/api/csp-report', (req, res) => {
+  const report = req.body?.['csp-report'] || req.body;
+  if (report) {
+    console.warn('[CSP 위반]', JSON.stringify(report));
+  }
+  res.status(204).end();
+});
 
 // 헬스 체크
 app.get('/api/health', (_req, res) => {
