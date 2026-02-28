@@ -41,7 +41,7 @@ export default function App() {
         <Suspense fallback={<div className="flex items-center justify-center min-h-[50vh] cu-empty">로딩 중...</div>}>
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/apply" element={<Apply />} />
+            <Route path="/apply" element={<ProtectedRoute><Apply /></ProtectedRoute>} />
             <Route path="/my" element={<ProtectedRoute><MyPage /></ProtectedRoute>} />
             <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />

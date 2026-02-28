@@ -431,9 +431,12 @@ async function searchYoutube(req, res) {
     res.json({ results });
   } catch (error) {
     console.error('[YouTube 검색 오류]', error.message);
-    const statusCode = error?.response?.status || Number(error?.code);
+    const statusCode = error?.response?.status ?? error?.status ?? Number(error?.code);
     if (statusCode === 403) {
       return res.status(403).json({ error: 'YouTube API 할당량이 초과되었습니다.' });
+    }
+    if (statusCode === 400) {
+      return res.status(500).json({ error: 'YouTube API 키가 유효하지 않습니다. 관리자에게 문의하세요.' });
     }
     res.status(500).json({ error: '검색에 실패했습니다.' });
   }
