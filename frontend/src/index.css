@@ -270,7 +270,7 @@ select {
     display: inline-flex;
     align-items: center;
     border-radius: 999px;
-    border: 1px solid transparent;
+    border: none;
     padding: 0.2rem 0.5rem;
     font-size: 0.68rem;
     font-weight: 600;
@@ -280,25 +280,21 @@ select {
 
   .cu-badge-muted {
     color: var(--cu-muted);
-    border-color: var(--cu-line);
     background: var(--cu-panel-soft);
   }
 
   .cu-badge-success {
     color: var(--cu-success);
-    border-color: var(--cu-success-border);
     background: var(--cu-success-soft);
   }
 
   .cu-badge-warning {
     color: var(--cu-warning);
-    border-color: var(--cu-warning-border);
     background: var(--cu-warning-soft);
   }
 
   .cu-badge-danger {
     color: var(--cu-danger);
-    border-color: var(--cu-danger-border);
     background: var(--cu-danger-soft);
   }
 
