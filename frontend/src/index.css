@@ -28,6 +28,9 @@
   --cu-focus-ring: #bcd3f3;
   --cu-tabbar-bg: #E6E6E7;
   --cu-tabbar-active: #FFFFFF;
+  --cu-purple: #8445f1;
+  --cu-purple-soft: #f0e8ff;
+  --cu-purple-border: #c4a0f5;
 }
 
 .dark {
@@ -57,6 +60,9 @@
   --cu-focus-ring: #3f608a;
   --cu-tabbar-bg: #393A3B;
   --cu-tabbar-active: #8C8D8F;
+  --cu-purple: #b48af7;
+  --cu-purple-soft: #2a1d4a;
+  --cu-purple-border: #5a3d8a;
 }
 
 * {

@@ -298,9 +298,9 @@ export default function Apply() {
             </button>
           </form>
 
-          <div className="p-4 rounded-lg border" style={{ background: 'var(--cu-accent-soft)', borderColor: 'color-mix(in srgb, var(--cu-accent) 25%, var(--cu-line))' }}>
-            <h3 className="text-sm font-medium mb-2" style={{ color: 'var(--cu-accent)' }}>안내사항</h3>
-            <ul className="text-xs space-y-1" style={{ color: 'var(--cu-accent)' }}>
+          <div className="p-4 rounded-lg" style={{ background: 'var(--cu-panel-soft)' }}>
+            <h3 className="text-sm font-medium mb-2">안내사항</h3>
+            <ul className="text-xs space-y-1" style={{ color: 'var(--cu-muted)' }}>
               <li>• {tab === 'wakeup' ? applyNotice.wakeupPrimary : applyNotice.radioPrimary}</li>
               <li>• {applyNotice.common}</li>
             </ul>
