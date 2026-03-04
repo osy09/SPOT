@@ -72,7 +72,7 @@ app.use((_req, res, next) => {
 // 인증 엔드포인트 Rate Limiting - 보안 강화됨
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15분
-  max: 50, // 각 IP당 15분에 50회로 제한
+  max: 200, // 각 IP당 15분에 200회로 제한
   message: { error: '너무 많은 로그인 시도가 있었습니다. 잠시 후 다시 시도해주세요.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -82,7 +82,7 @@ const authLimiter = rateLimit({
 // API 엔드포인트 Rate Limiting - 보안 강화됨
 const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1분
-  max: 300, // 각 IP당 1분에 300회로 제한
+  max: 1200, // 각 IP당 1분에 1200회로 제한
   message: { error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -91,7 +91,7 @@ const apiLimiter = rateLimit({
 // 다운로드 전용 Rate Limiting - yt-dlp+ffmpeg 프로세스 생성 비용 고려
 const downloadLimiter = rateLimit({
   windowMs: 60 * 1000, // 1분
-  max: 5, // IP당 1분에 5회
+  max: 20, // IP당 1분에 20회
   message: { error: '다운로드 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
   standardHeaders: true,
   legacyHeaders: false,
